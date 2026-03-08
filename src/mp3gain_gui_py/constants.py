@@ -6,7 +6,7 @@ from threep_commons.app_identity import AppIdentity
 
 SETTINGS_ORG_NAME = "ThreepSoftwz"
 SETTINGS_APP_NAME = "mp3gain_gui_py"
-APP_DISPLAY_NAME = "mp3gain-gui-py"
+APP_DISPLAY_NAME = "MP3Gain"
 APP_VERSION = "0.1.0"
 DEFAULT_LOG_FILENAME = "mp3gain_gui_py.log"
 DEFAULT_LOG_MAX_BYTES = 1_048_576

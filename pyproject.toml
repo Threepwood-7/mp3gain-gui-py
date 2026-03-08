@@ -23,7 +23,14 @@ dependencies = [
 
   "PySide6>=6.10.2",
 
+  "mutagen>=1.47",
+
+  "miniaudio>=1.60",
+
 ]
+
+[project.optional-dependencies]
+fast = ["numpy>=1.26"]
 
 [project.urls]
 Homepage = "https://github.com/Threepwood-7/mp3gain-gui-py"

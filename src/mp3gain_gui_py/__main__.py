@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import sys
+
 
 def main() -> int:
-    """Run the package entry point and exit successfully."""
+    from .app_controller import AppController  # noqa: PLC0415
 
-    return 0
+    ctrl = AppController(sys.argv)
+    return ctrl.run()
 
 
 if __name__ == "__main__":
