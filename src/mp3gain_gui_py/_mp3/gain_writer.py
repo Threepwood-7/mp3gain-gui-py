@@ -50,6 +50,7 @@ def apply_gain_change(
     *,
     wrap: bool = False,
     preserve_timestamp: bool = False,
+    use_temp_file: bool = True,
     gain_delta_right: int | None = None,
 ) -> None:
     """Modify every frame's global_gain fields by ``gain_delta``.
@@ -62,6 +63,8 @@ def apply_gain_change(
         wrap:               If True, wrap around 0-255 (C wrapGain mode).
                             If False, clamp to 0-255 and skip gain==0 frames.
         preserve_timestamp: Restore file modification time after write.
+        use_temp_file:      If True, write through legacy temp file replacement.
+                            If False, write in-place directly to the target file.
         gain_delta_right:   If provided, apply a *different* gain to the right
                             channel (dual-mono mode).  gain_delta is used for
                             the left channel.
@@ -136,10 +139,14 @@ def apply_gain_change(
 
         pos += header.frame_size_bytes
 
-    # Write via temp file then rename.
-    tmp = _legacy_tmp_path(path)
-    tmp.write_bytes(bytes(data))
-    _replace_with_retry(tmp, path)
+    output = bytes(data)
+    if use_temp_file:
+        # Write via temp file then rename.
+        tmp = _legacy_tmp_path(path)
+        tmp.write_bytes(output)
+        _replace_with_retry(tmp, path)
+    else:
+        path.write_bytes(output)
 
     if preserve_timestamp and mtime is not None:
         os.utime(path, (mtime, mtime))
@@ -198,6 +205,7 @@ def undo_gain_change(
     *,
     wrap: bool = False,
     preserve_timestamp: bool = False,
+    use_temp_file: bool = True,
 ) -> None:
     """Undo a previously applied gain change using the MP3GAIN_UNDO tag value.
 
@@ -220,5 +228,6 @@ def undo_gain_change(
         left_delta,
         wrap=wrap,
         preserve_timestamp=preserve_timestamp,
+        use_temp_file=use_temp_file,
         gain_delta_right=right_delta,
     )

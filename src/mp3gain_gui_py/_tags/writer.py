@@ -56,6 +56,14 @@ def delete_tags(path: Path) -> None:
     _delete_id3_keys(path)
 
 
+def delete_tags_for_format(path: Path, *, tag_format: Literal["apev2", "id3"]) -> None:
+    """Remove MP3Gain fields from the selected backend only."""
+    if tag_format == "apev2":
+        _delete_apev2_keys(path)
+    else:
+        _delete_id3_keys(path)
+
+
 # ── APEv2 ──────────────────────────────────────────────────────────────────────
 
 

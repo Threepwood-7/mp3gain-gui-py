@@ -16,9 +16,15 @@ from typing import Literal
 from .._engine.pcm_reader import decode_to_stereo_chunks, read_mp3_info
 from .._engine.replaygain import GainAnalyzer
 from .._mp3.file_info import scan_file, scan_max_amplitude
+from .._mp3.frame_parser import (
+    FrameHeader,
+    find_next_frame,
+    has_xing_or_info_tag,
+    parse_frame_header,
+)
 from .._mp3.gain_writer import apply_gain_change, undo_gain_change
 from .._tags.reader import TagData, read_tags
-from .._tags.writer import write_tags
+from .._tags.writer import delete_tags, delete_tags_for_format, write_tags
 from .math import db_to_legacy_steps
 
 StoredTagPolicy = Literal["auto", "skip", "recalc", "check_only"]
@@ -29,7 +35,9 @@ class LegacyCompatOptions:
     """Options controlling legacy-compatible file mutation behavior."""
 
     wrap_gain: bool = False
+    auto_clip: bool = False
     preserve_timestamp: bool = False
+    use_temp_file: bool = True
     tag_format: Literal["apev2", "id3"] = "apev2"
     stored_tag_policy: StoredTagPolicy = "auto"
 
@@ -79,6 +87,31 @@ class LegacyExactProcessor:
     def analyze_minmax_gain(self, path: Path) -> tuple[int, int]:
         return scan_file(path)
 
+    def analyze_album_gain_db(self, paths: list[Path]) -> float:
+        if not paths:
+            return 0.0
+        values = [self.analyze_track_gain_db(path) for path in paths]
+        return sum(values) / float(len(values))
+
+    def analyze_album_minmax_gain(self, paths: list[Path]) -> tuple[int, int]:
+        if not paths:
+            return 0, 0
+        mins: list[int] = []
+        maxes: list[int] = []
+        for path in paths:
+            min_gain, max_gain = self.analyze_minmax_gain(path)
+            mins.append(min_gain)
+            maxes.append(max_gain)
+        return min(mins), max(maxes)
+
+    def compute_autoclip_steps(self, requested_steps: int, *, min_gain: int, max_gain: int) -> int:
+        """Clamp requested step deltas to avoid legacy global_gain clipping."""
+        if requested_steps > 0:
+            return min(requested_steps, 255 - max_gain)
+        if requested_steps < 0:
+            return max(requested_steps, -min_gain)
+        return 0
+
     def apply_db_gain(
         self,
         path: Path,
@@ -123,8 +156,50 @@ class LegacyExactProcessor:
             gain_delta_right=right,
             wrap=options.wrap_gain,
             preserve_timestamp=options.preserve_timestamp,
+            use_temp_file=options.use_temp_file,
         )
         return LegacyCommandResult(exit_code=0, changed=True)
+
+    def apply_direct_gain_steps(
+        self,
+        path: Path,
+        *,
+        steps: int,
+        options: LegacyCompatOptions,
+    ) -> LegacyCommandResult:
+        return self.apply_steps(path, left_steps=steps, options=options)
+
+    def apply_single_channel_steps(
+        self,
+        path: Path,
+        *,
+        channel_index: int,
+        steps: int,
+        options: LegacyCompatOptions,
+    ) -> LegacyCommandResult:
+        header = self._read_first_audio_header(path)
+        if header is None:
+            return LegacyCommandResult(exit_code=1, changed=False, message="No MPEG audio frame found")
+        if header.num_channels == 1:
+            return LegacyCommandResult(exit_code=1, changed=False, message="Single-channel gain unsupported for mono")
+        # Legacy mp3gain rejects single-channel edits for joint-stereo files.
+        if header.channel_mode == 0x01:
+            return LegacyCommandResult(
+                exit_code=1,
+                changed=False,
+                message="Single-channel gain unsupported for joint stereo",
+            )
+        if channel_index not in {0, 1}:
+            return LegacyCommandResult(exit_code=1, changed=False, message="Channel index must be 0 or 1")
+
+        left_steps = steps if channel_index == 0 else 0
+        right_steps = steps if channel_index == 1 else 0
+        return self.apply_steps(
+            path,
+            left_steps=left_steps,
+            right_steps=right_steps,
+            options=options,
+        )
 
     def undo(self, path: Path, *, options: LegacyCompatOptions) -> LegacyCommandResult:
         """Undo a prior apply operation using MP3GAIN_UNDO metadata.
@@ -139,7 +214,20 @@ class LegacyExactProcessor:
             tags.undo_tag_value,
             wrap=options.wrap_gain,
             preserve_timestamp=options.preserve_timestamp,
+            use_temp_file=options.use_temp_file,
         )
+        return LegacyCommandResult(exit_code=0, changed=True)
+
+    def delete_mp3gain_tags(
+        self,
+        path: Path,
+        *,
+        tag_format: Literal["apev2", "id3"] | None = None,
+    ) -> LegacyCommandResult:
+        if tag_format is None:
+            delete_tags(path)
+        else:
+            delete_tags_for_format(path, tag_format=tag_format)
         return LegacyCommandResult(exit_code=0, changed=True)
 
     def write_replaygain_tags(
@@ -177,3 +265,33 @@ class LegacyExactProcessor:
             ),
             tag_format=tag_format,
         )
+
+    def _read_first_audio_header(self, path: Path) -> FrameHeader | None:
+        data = path.read_bytes()
+        pos = 0
+        if data[:3] == b"ID3" and len(data) >= 10:
+            id3_size = (
+                (data[9] & 0x7F)
+                | ((data[8] & 0x7F) << 7)
+                | ((data[7] & 0x7F) << 14)
+                | ((data[6] & 0x7F) << 21)
+            )
+            pos = 10 + id3_size
+
+        first_audio_frame = True
+        while True:
+            pos = find_next_frame(data, pos)
+            if pos < 0:
+                return None
+            header = parse_frame_header(data, pos)
+            if header is None:
+                pos += 1
+                continue
+            if pos + header.frame_size_bytes > len(data):
+                return None
+            if first_audio_frame:
+                first_audio_frame = False
+                if has_xing_or_info_tag(data, pos, header):
+                    pos += header.frame_size_bytes
+                    continue
+            return header
