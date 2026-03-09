@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from .frame_parser import find_next_frame, global_gain_offsets, parse_frame_header
+from .frame_parser import (
+    find_next_frame,
+    global_gain_offsets,
+    has_xing_or_info_tag,
+    parse_frame_header,
+)
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _peek8_bits(data: bytes, byte_off: int, bit_off: int) -> int:
@@ -23,6 +31,7 @@ def scan_file(path: Path) -> tuple[int, int]:
     min_gain = 255
     max_gain = 0
     pos = 0
+    first_audio_frame = True
 
     # Skip ID3v2 tag if present
     if data[:3] == b"ID3":
@@ -45,6 +54,12 @@ def scan_file(path: Path) -> tuple[int, int]:
 
         if pos + header.frame_size_bytes > len(data):
             break
+
+        if first_audio_frame:
+            first_audio_frame = False
+            if has_xing_or_info_tag(data, pos, header):
+                pos += header.frame_size_bytes
+                continue
 
         for byte_off, bit_off in global_gain_offsets(header):
             abs_byte = pos + byte_off

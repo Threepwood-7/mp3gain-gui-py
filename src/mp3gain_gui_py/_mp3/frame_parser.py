@@ -103,10 +103,7 @@ def parse_frame_header(data: bytes, offset: int) -> FrameHeader | None:
 
     # Frame size = floor(144 * bitrate / samplerate) + padding  (MPEG1 Layer III)
     # MPEG2/2.5 uses 72 * bitrate / samplerate
-    if mpeg_ver == _MPEG1:
-        bitbase = 144.0
-    else:
-        bitbase = 72.0
+    bitbase = 144.0 if mpeg_ver == _MPEG1 else 72.0
 
     frame_size = int(bitbase * bitrate_kbps * 1000 / sample_rate_hz) + (1 if padding else 0)
 
@@ -132,9 +129,8 @@ def find_next_frame(data: bytes, start: int) -> int:
     i = start
     limit = len(data) - 3
     while i <= limit:
-        if data[i] == 0xFF and (data[i + 1] & 0xE0) == 0xE0:
-            if parse_frame_header(data, i) is not None:
-                return i
+        if data[i] == 0xFF and (data[i + 1] & 0xE0) == 0xE0 and parse_frame_header(data, i) is not None:
+            return i
         i += 1
     return -1
 
@@ -152,24 +148,24 @@ def global_gain_offsets(header: FrameHeader) -> list[tuple[int, int]]:
     MPEG1 stereo (32-byte sideinfo):
       bit 0-8   main_data_begin (9)
       bit 9-11  private_bits (3)
-      bit 12-19 scfsi 2×4
-      granule×channel×58-bit blocks, global_gain at offset+21 within each
+      bit 12-19 scfsi 2x4
+      granulexchannelx58-bit blocks, global_gain at offset+21 within each
 
     MPEG1 mono (17-byte sideinfo):
       bit 0-8   main_data_begin (9)
       bit 9-13  private_bits (5)
-      bit 14-17 scfsi 1×4
-      granule×channel×58-bit blocks
+      bit 14-17 scfsi 1x4
+      granulexchannelx58-bit blocks
 
     MPEG2 stereo (17-byte sideinfo):
       bit 0-7   main_data_begin (8)
       bit 8-9   private_bits (2)
-      channel×63-bit blocks, global_gain at offset+21 within each
+      channelx63-bit blocks, global_gain at offset+21 within each
 
     MPEG2 mono (9-byte sideinfo):
       bit 0-7   main_data_begin (8)
       bit 8     private_bits (1)
-      channel×63-bit block
+      channelx63-bit block
     """
     is_mpeg1 = (header.mpeg_version == _MPEG1)
     nchan = header.num_channels
@@ -198,3 +194,16 @@ def global_gain_offsets(header: FrameHeader) -> list[tuple[int, int]]:
             pre_bits += block_bits
 
     return results
+
+
+def has_xing_or_info_tag(data: bytes, frame_offset: int, header: FrameHeader) -> bool:
+    """Return True if *header* frame carries a Xing/Info VBR header marker."""
+    if header.mpeg_version == _MPEG1:
+        sideinfo_len = 17 if header.num_channels == 1 else 32
+    else:
+        sideinfo_len = 9 if header.num_channels == 1 else 17
+
+    sideinfo_start = frame_offset + 4 + (2 if header.crc_protected else 0)
+    marker_offset = sideinfo_start + sideinfo_len
+    marker = data[marker_offset: marker_offset + 4]
+    return marker in (b"Xing", b"Info")

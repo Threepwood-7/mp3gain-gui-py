@@ -210,13 +210,15 @@ hatch run lint:check    # ruff — zero errors
 
 ### Manual gain application check
 
-Apply Python gain to original files, save to `c:\tmp\mp3\89dbclaude\`, compare
+Apply Python gain to original files, save to `c:\tmp\mp3\89dbcodex\`, compare
 byte-level with `c:\tmp\mp3\89db\` (processed by reference MP3GainGUI.exe to 89 dB):
 
 ```bash
 # TODO: implement apply_gain_change() validation script
 # scripts/apply_and_compare.py
 ```
+
+Parity test runs use `c:\tmp\mp3\89dbcodex\` as the output working directory.
 
 Reference binary for cross-checking gain application:
 
@@ -286,3 +288,41 @@ Default values live in `registry.py` (class constants on `SettingsRegistry`).
 
 - **compare_analysis.py — Unicode on Windows console**: Replace `✓`/`✗` with
   ASCII equivalents when stdout encoding is not UTF-8. Fixed in current version.
+
+---
+
+## Progress log 2026-03-09
+
+### Implemented this session
+
+- Added parity tooling scripts:
+  - `scripts/parity_common.py`
+  - `scripts/parity_oracle_snapshot.py`
+  - `scripts/parity_build_codex_89db.py`
+  - `scripts/parity_compare.py`
+- Added optional integration smoke test:
+  - `tests/integration/test_parity_smoke.py`
+- Reworked `scripts/compare_analysis.py` to be analysis-only and to validate min/max global_gain against reference.
+- Implemented first-frame Xing/Info skip behavior in scan/write paths.
+- Updated worker logic:
+  - `AnalyzeWorker` now uses MP3Gain-style semantics (`track_gain_db = raw_db`, `volume_db = target - raw_db`).
+  - `GainWorker` now calls gain APIs with correct signatures and uses file tags for apply/undo values.
+- Fixed tag gain formatter bug in `src/mp3gain_gui_py/_tags/formats.py` (`+9.6f` format spec).
+
+### Validation artifacts
+
+- Oracle snapshot:
+  - `c:/tmp/pycompa/parity_oracle_snapshot.json`
+- Build report:
+  - `c:/tmp/pycompa/parity_build_codex_89db.json`
+- Parity compare report:
+  - `c:/tmp/pycompa/parity_compare_report.json`
+- Long analysis log:
+  - `c:/tmp/pycompa/compare_analysis_after_patch.log`
+
+### Current parity state
+
+- `scripts/parity_compare.py` currently reports `FAIL`.
+- Byte-identical parity vs `c:/tmp/mp3/89db` is not yet achieved (0/7 identical).
+- `mp3gain.exe -q -o` outputs are very close but not exact for some `dB gain` and `max amplitude` values.
+- Global gain min/max scan improved (files 1-4 match), but files 5-7 still differ from reference.

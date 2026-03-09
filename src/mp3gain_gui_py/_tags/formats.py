@@ -26,7 +26,7 @@ ALL_MP3GAIN_KEYS: frozenset[str] = frozenset({
 
 def format_gain(db: float) -> str:
     """Format a gain value as ``+0.123456 dB`` (9-decimal, explicit sign)."""
-    return f"{db:+-9.6f} dB"
+    return f"{db:+9.6f} dB"
 
 
 def format_peak(peak: float) -> str:

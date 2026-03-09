@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 from .._engine.pcm_reader import decode_to_stereo_chunks, read_mp3_info
@@ -12,6 +12,8 @@ from .._mp3.file_info import scan_file, scan_max_amplitude
 from .types import FileResult, WorkerRequest, WorkerResult
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from .worker_bridge import WorkerBridge
 
 class AnalyzeWorker:
@@ -80,10 +82,8 @@ class AnalyzeWorker:
         for group_paths in groups.values():
             # Determine common sample rate (first file wins; all should match)
             sr = 44100
-            try:
+            with suppress(Exception):
                 sr, _ = read_mp3_info(group_paths[0])
-            except Exception:
-                pass
 
             ga = GainAnalyzer(sr)
 
@@ -109,9 +109,9 @@ class AnalyzeWorker:
                 r = results_by_path.get(path)
                 if r is None or not r.ok:
                     continue
-                if album_raw_db is not None and r.track_gain_db is not None:
-                    album_gain_db = req.target_db - album_raw_db
-                    album_volume_db = req.target_db - album_gain_db
+                if album_raw_db is not None:
+                    album_gain_db = album_raw_db
+                    album_volume_db = req.target_db - album_raw_db
                     max_amp = r.max_amplitude or 0.0
                     clip_album = max_amp * _db_to_linear(album_gain_db) if max_amp else None
                     r = FileResult(
@@ -165,13 +165,13 @@ class AnalyzeWorker:
                 ga.analyze_samples(left, right, len(left))
 
             raw_db = ga.get_title_gain()
-            track_gain_db = target_db - raw_db
-            volume_db = raw_db
+            track_gain_db = raw_db
+            volume_db = target_db - raw_db
 
             min_g, max_g = scan_file(path)
             max_amp = scan_max_amplitude(path)
 
-            # Clipping: would current tag gain cause clipping?
+            # Clipping after applying the recommended track gain.
             clip_track = max_amp * _db_to_linear(track_gain_db) if max_amp else None
             clipping = clip_track is not None and clip_track > 32767.0
 

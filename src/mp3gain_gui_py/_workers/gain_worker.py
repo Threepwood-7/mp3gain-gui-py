@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .._mp3.gain_writer import apply_gain_change, undo_gain_change
+from .._tags.reader import read_tags
 from .types import FileResult, WorkerRequest, WorkerResult
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from .worker_bridge import WorkerBridge
 
 
@@ -58,8 +60,10 @@ class GainWorker:
         req = self._request
         try:
             if req.kind == "undo":
+                undo_tag = self._undo_tag_for(path)
                 undo_gain_change(
                     path,
+                    undo_tag,
                     wrap=req.wrap_gain,
                     preserve_timestamp=req.preserve_dates,
                 )
@@ -67,7 +71,6 @@ class GainWorker:
                 gain_db = self._gain_for(path)
                 steps = round(gain_db / 1.5)
                 apply_gain_change(
-                    path,
                     path,
                     steps,
                     wrap=req.wrap_gain,
@@ -82,17 +85,19 @@ class GainWorker:
         if req.kind == "apply_constant":
             return req.constant_db
         if req.kind == "apply_track":
-            # track_gain_db stored in file entry is pre-computed
-            # (req.album_groups stores {path_str: gain_db} for per-file gains)
-            per_file = req.album_groups.get(str(path))
-            if per_file:
-                return float(per_file[0]) if per_file else 0.0  # type: ignore[arg-type]
-            return 0.0
+            tag_data = read_tags(path)
+            return tag_data.track_gain_db if tag_data.track_gain_db is not None else 0.0
         if req.kind == "apply_album":
-            per_group = req.album_groups.get(str(path.parent))
-            if per_group:
-                return float(per_group[0]) if per_group else 0.0  # type: ignore[arg-type]
+            tag_data = read_tags(path)
+            if tag_data.album_gain_db is not None:
+                return tag_data.album_gain_db
+            if tag_data.track_gain_db is not None:
+                return tag_data.track_gain_db
             return 0.0
         return 0.0
 
-
+    def _undo_tag_for(self, path: Path) -> str:
+        tag_data = read_tags(path)
+        if tag_data.has_undo:
+            return tag_data.undo_tag_value
+        raise ValueError(f"Missing MP3GAIN_UNDO tag in {path}")

@@ -6,15 +6,17 @@ Mirrors changeGain() from mp3gain.c.
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from .crc import write_frame_crc
 from .frame_parser import (
-    _MPEG1,
     find_next_frame,
     global_gain_offsets,
+    has_xing_or_info_tag,
     parse_frame_header,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _peek8_bits(data: bytearray, byte_off: int, bit_off: int) -> int:
@@ -33,16 +35,6 @@ def _set8_bits(data: bytearray, byte_off: int, bit_off: int, value: int) -> None
     v = (value & 0xFF) << (8 - bit_off)   # shift value into place in 16-bit word
     data[byte_off]     = (data[byte_off]     & mask_left)  | (v >> 8)
     data[byte_off + 1] = (data[byte_off + 1] & mask_right) | (v & 0xFF)
-
-
-def _sideinfo_end(frame: bytes | bytearray, crc_protected: bool, mpeg1: bool, mono: bool) -> int:
-    """Return the exclusive byte index of sideinfo end within the frame."""
-    offset = 4 + (2 if crc_protected else 0)
-    if mpeg1:
-        offset += 17 if mono else 32
-    else:
-        offset += 9 if mono else 17
-    return offset
 
 
 def apply_gain_change(
@@ -85,8 +77,7 @@ def apply_gain_change(
         )
         pos = 10 + id3_size
 
-    # Skip Xing/Info VBR header frame if present
-    # (mp3gain skips the first frame when it contains a Xing/Info tag)
+    first_audio_frame = True
 
     while True:
         pos = find_next_frame(bytes(data), pos)
@@ -99,9 +90,14 @@ def apply_gain_change(
         if pos + header.frame_size_bytes > len(data):
             break
 
+        # mp3gain.c skips the Xing/Info frame when present as first frame.
+        if first_audio_frame:
+            first_audio_frame = False
+            if has_xing_or_info_tag(bytes(data), pos, header):
+                pos += header.frame_size_bytes
+                continue
+
         offsets = global_gain_offsets(header)
-        is_mpeg1 = header.mpeg_version == _MPEG1
-        mono = header.num_channels == 1
 
         changed = False
         for ch_idx, (byte_off, bit_off) in enumerate(offsets):
@@ -127,13 +123,7 @@ def apply_gain_change(
 
         # Recalculate CRC if the frame is CRC-protected and we changed something
         if changed and header.crc_protected:
-            si_end = _sideinfo_end(data[pos:], True, is_mpeg1, mono)
-            write_frame_crc(bytearray(data[pos: pos + si_end + 4]), si_end)
-            # write_frame_crc works on a slice copy; write back
-            crc_slice = bytearray(data[pos: pos + si_end])
-            write_frame_crc(crc_slice, si_end - pos if si_end > pos else si_end)
-            # simpler: recalculate directly on the main buffer
-            _recalc_crc(data, pos, is_mpeg1, mono)
+            _recalc_crc(data, pos, header.mpeg_version == 0x03, header.num_channels == 1)
 
         pos += header.frame_size_bytes
 
@@ -154,10 +144,7 @@ def _recalc_crc(data: bytearray, frame_start: int, mpeg1: bool, mono: bool) -> N
     crc = crc16_update(data[frame_start + 2], crc)
     crc = crc16_update(data[frame_start + 3], crc)
     # sideinfo starts at byte 6 of the frame
-    if mpeg1:
-        si_len = 17 if mono else 32
-    else:
-        si_len = 9 if mono else 17
+    si_len = (17 if mono else 32) if mpeg1 else (9 if mono else 17)
     for i in range(6, 6 + si_len):
         crc = crc16_update(data[frame_start + i], crc)
     data[frame_start + 4] = (crc >> 8) & 0xFF
