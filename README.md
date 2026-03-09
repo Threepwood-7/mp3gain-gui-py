@@ -7,13 +7,13 @@ PySide6 port of MP3Gain GUI - ReplayGain analysis and gain adjustment
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
-
 - [Usage](#usage)
-- [Legacy CLI Parity Mode](#legacy-cli-parity-mode)
-- [Parity Scripts](#parity-scripts)
+- [What Is ReplayGain?](#what-is-replaygain)
+- [Legacy CLI](#legacy-cli)
+- [Parity Harness](#parity-harness)
+- [rgain3 Notes](#rgain3-notes)
 - [Configuration](#configuration)
 - [Logging](#logging)
-
 - [Project Structure](#project-structure)
 - [Architecture Patterns](#architecture-patterns)
 - [Development](#development)
@@ -60,32 +60,149 @@ pyw scripts\windows\run_app_gui.pyw
 python -m mp3gain_gui_py
 ```
 
-### Legacy CLI Parity Mode
-
-Use the legacy-compatible CLI entrypoint when you need switch-level behavior aligned with `mp3gain.exe`.
+### Legacy CLI Entrypoint
 
 ```bat
 python -m mp3gain_gui_py.legacy_cli /q /o /s r "song.mp3"
+```
+
+## What Is ReplayGain?
+
+ReplayGain is a loudness normalization method. It measures perceived loudness and stores (or applies) gain so playback volume is consistent.
+
+Key concepts:
+- `Track Gain`: normalize each track independently to a reference loudness.
+- `Album Gain`: normalize a whole album with one shared gain so relative song-to-song dynamics stay intact.
+- `Peak`: max sample level; used to estimate clipping risk when gain is increased.
+- `Clipping prevention`: lower recommended gain when needed to avoid overflow distortion.
+
+ReplayGain can be applied in two broad ways:
+- Metadata-only: write gain tags and let the player apply them at playback.
+- Audio-data modification: directly change codec gain fields in the file.
+
+`mp3gain` uses audio-data modification for MP3 global gain fields (with optional tags for undo/state). For MP3, effective changes are quantized to ~1.5 dB steps.
+
+Important distinctions from the original MP3Gain FAQ:
+- ReplayGain is not peak normalization. Two files can have similar peaks but very different perceived loudness.
+- MP3Gain-style volume changes do not decode and re-encode MP3 audio. Volume is adjusted via MP3 gain fields, so repeated adjustments do not add transcoding loss.
+
+## Legacy CLI
+
+The project exposes a legacy-compatible CLI surface through:
+
+```bat
+python -m mp3gain_gui_py.legacy_cli [switches] <file1.mp3> [file2.mp3 ...]
+```
+
+Switches accept either `/` or `-` prefixes. Attached and separated values are supported (`/d1.5` and `/d 1.5`).
+
+### Switch Reference
+
+| Switch | Meaning |
+|---|---|
+| `/v` | Show version-style info. |
+| `/h`, `/?` | Show help text. `/? wrap` asks for wrap-topic help. |
+| `/q` | Quiet mode (minimal status output). |
+| `/o` | Tabular output (database-friendly fields). |
+| `/s c` | Check stored gain/tag info only (no recalc). |
+| `/s d` | Delete MP3Gain stored tag info. |
+| `/s s` | Skip stored tag info (ignore read/write tags). |
+| `/s r` | Force recalculation (do not read tag info). |
+| `/s i` | Use ID3v2 backend for MP3Gain tag fields. |
+| `/s a` | Use APEv2 backend for MP3Gain tag fields (legacy default). |
+| `/r` | Apply Track gain automatically. |
+| `/a` | Apply Album gain automatically. |
+| `/e` | Skip album analysis even with multiple files (track-only behavior). |
+| `/g <i>` | Apply explicit integer MP3 gain steps directly (no analysis). |
+| `/l <ch> <i>` | Apply explicit integer steps to one channel only (stereo-only path). |
+| `/m <i>` | Add integer step modifier to suggested gain. |
+| `/d <n>` | Add floating-point dB modifier to suggested gain. |
+| `/k` | Auto-lower gain to avoid clipping. |
+| `/c` | Continue/apply despite clipping warning. |
+| `/w` | Wrap gain arithmetic at boundaries (legacy wrap behavior). |
+| `/p` | Preserve original file timestamps when mutating files. |
+| `/t` | Use alternate write mode (legacy temp-file behavior switch). |
+| `/x` | Max-amplitude-focused mode (analysis emphasis). |
+| `/f` | Force mode for legacy compatibility paths. |
+| `/u` | Undo prior MP3Gain change using stored undo metadata. |
+
+Behavior notes:
+- `/r` and `/a`: if both are present, the last one wins.
+- `/g` and `/l` are direct apply modes (bypass normal analysis/recommend flow).
+- Legacy MP3 global gain math is step-based, so exact dB targets can round to nearest step.
+- Runtime parity mode: when available, this CLI delegates execution to local `mp3gain.exe` (`c:\bin\mp3gain-win-1_2_5\mp3gain.exe`) to preserve output/byte behavior in parity runs.
+
+### Tag Behavior and Player Compatibility
+
+MP3Gain stores analysis/undo state in MP3 tags. Historically this is often APEv2 (`/s a`) and can also be ID3-based (`/s i`).
+
+Practical guidance:
+- Use `/s r` when you want forced recalculation and no tag reads.
+- Use `/s s` when you want to skip both reading and writing MP3Gain tags.
+- Use `/s d` to remove MP3Gain analysis/undo tags already written.
+
+Compatibility note (from MP3Gain FAQ experience):
+- Some players with non-standard tag handling can display garbage metadata after APEv2 tag writes. If that happens, prefer skip/delete-tag flows (`/s s`, `/s d`) or switch tag backend strategy.
+
+### Common Command Recipes
+
+Analyze with recalculation (ignore tags):
+
+```bat
+python -m mp3gain_gui_py.legacy_cli /q /o /s r "song.mp3"
+```
+
+Track normalize near 89 dB baseline:
+
+```bat
 python -m mp3gain_gui_py.legacy_cli /q /r /c /s r /g 0 "song.mp3"
+```
+
+Track normalize lane equivalent to 87 dB and 81 dB:
+
+```bat
 python -m mp3gain_gui_py.legacy_cli /q /r /c /s r /g 0 /d -2 "song.mp3"
 python -m mp3gain_gui_py.legacy_cli /q /r /c /s r /g 0 /d -8 "song.mp3"
+```
+
+Modifier lanes:
+
+```bat
 python -m mp3gain_gui_py.legacy_cli /q /r /c /s r /m 1 "song.mp3"
 python -m mp3gain_gui_py.legacy_cli /q /r /c /s r /d 1.5 "song.mp3"
 ```
 
-Notes:
-- Supports both `-` and `/` prefixes for legacy switches.
-- For parity-critical runs, this path is wired to the local oracle binary (`c:\bin\mp3gain-win-1_2_5\mp3gain.exe`) so output and file mutation can match byte-for-byte.
+## Parity Harness
 
-## Parity Scripts
-
-Use the matrix harness to run multiple oracle-vs-python CLI cases and emit machine-readable artifacts.
+Use the parity matrix harness to compare oracle CLI behavior vs Python CLI behavior across case catalogs.
 
 ```bat
 hatch run python scripts/parity_cli_matrix.py --sample 2 --jobs 2
 ```
 
-By default this writes JSON/JSONL/XLSX parity artifacts under `c:\tmp\pycompa`.
+Default artifact output:
+- `c:\tmp\pycompa\parity_cli_full_run_<ts>.json`
+- `c:\tmp\pycompa\parity_cli_full_results_<ts>.json`
+- `c:\tmp\pycompa\parity_cli_full_progress_<ts>.jsonl`
+- `c:\tmp\pycompa\parity_cli_full_report_<ts>.xlsx`
+
+## rgain3 Notes
+
+[`rgain3`](https://github.com/chaudum/rgain3) is a Python ReplayGain toolkit focused on metadata-driven multi-format workflows (for example MP3/FLAC/MP4 via its scanner/writer toolchain).
+
+Why this matters here:
+- `mp3gain` parity is MP3 global-gain mutation focused.
+- `rgain3` is a strong reference for metadata-centric ReplayGain flows and collection-wide album grouping.
+- Future integration candidates include:
+  - metadata-only scan/write modes,
+  - collection/album-ID style workflows,
+  - MP3 tag-format policy options aligned with broader ReplayGain ecosystems.
+
+## References
+
+- MP3Gain FAQ: https://mp3gain.sourceforge.net/faq.php
+- ReplayGain overview: https://wiki.hydrogenaudio.org/index.php?title=ReplayGain
+- rgain3 project: https://github.com/chaudum/rgain3
 
 ## Configuration
 
