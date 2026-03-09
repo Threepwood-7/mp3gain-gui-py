@@ -40,5 +40,9 @@ def test_parity_smoke_external() -> None:
     if mode == "full" and os.environ.get("MP3GAIN_PARITY_FORCE_REBUILD") == "1":
         command.append("--force-rebuild")
 
+    legacy_profile = os.environ.get("MP3GAIN_PARITY_LEGACY_PROFILE")
+    if legacy_profile:
+        command.extend(["--legacy-profile", legacy_profile])
+
     completed = subprocess.run(command, cwd=repo_root, check=False, text=True)
     assert completed.returncode == 0, f"Parity command failed: {' '.join(command)}"

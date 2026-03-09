@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 OperationKind = Literal[
     "track_analyze",
@@ -15,6 +17,7 @@ OperationKind = Literal[
     "undo",
     "delete_tags",
 ]
+StoredTagPolicy = Literal["auto", "skip", "recalc", "check_only"]
 
 
 @dataclass
@@ -35,6 +38,7 @@ class WorkerRequest:
 
     # Tag write mode
     tag_mode: str = "apev2"
+    stored_tag_policy: StoredTagPolicy = "auto"
 
     # Gain writer options
     wrap_gain: bool = False

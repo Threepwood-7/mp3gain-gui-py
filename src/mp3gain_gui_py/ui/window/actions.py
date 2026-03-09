@@ -12,9 +12,9 @@ from threep_commons.qt.slots import safe_slot
 from ..._workers.types import WorkerRequest
 
 if TYPE_CHECKING:
-    from .._main_window import MainWindow
     from ..._settings.manager import SettingsManager
     from ..._workers.worker_bridge import WorkerBridge
+    from .._main_window import MainWindow
 
 
 class WindowActionsCoordinator:
@@ -199,6 +199,7 @@ class WindowActionsCoordinator:
             paths=paths,
             target_db=self._settings.target_volume_db,
             tag_mode=self._settings.tag_mode,
+            stored_tag_policy=self._settings.stored_tag_policy,
         )
         self._start_worker(req)
 
@@ -213,6 +214,7 @@ class WindowActionsCoordinator:
             album_groups=self._window.model.album_groups(),
             target_db=self._settings.target_volume_db,
             tag_mode=self._settings.tag_mode,
+            stored_tag_policy=self._settings.stored_tag_policy,
         )
         self._start_worker(req)
 
@@ -224,6 +226,8 @@ class WindowActionsCoordinator:
         req = WorkerRequest(
             kind="apply_track",
             paths=paths,
+            tag_mode=self._settings.tag_mode,
+            stored_tag_policy=self._settings.stored_tag_policy,
             wrap_gain=self._settings.wrap_gain,
             preserve_dates=self._settings.preserve_dates,
         )
@@ -238,6 +242,8 @@ class WindowActionsCoordinator:
             kind="apply_album",
             paths=paths,
             album_groups=self._window.model.album_groups(),
+            tag_mode=self._settings.tag_mode,
+            stored_tag_policy=self._settings.stored_tag_policy,
             wrap_gain=self._settings.wrap_gain,
             preserve_dates=self._settings.preserve_dates,
         )
@@ -245,7 +251,7 @@ class WindowActionsCoordinator:
 
     @safe_slot
     def _on_apply_constant(self) -> None:
-        from PySide6.QtWidgets import QInputDialog  # noqa: PLC0415
+        from PySide6.QtWidgets import QInputDialog
 
         paths = self._window.model.all_paths()
         if not paths:
@@ -265,6 +271,8 @@ class WindowActionsCoordinator:
             kind="apply_constant",
             paths=paths,
             constant_db=db,
+            tag_mode=self._settings.tag_mode,
+            stored_tag_policy=self._settings.stored_tag_policy,
             wrap_gain=self._settings.wrap_gain,
             preserve_dates=self._settings.preserve_dates,
         )
@@ -278,6 +286,8 @@ class WindowActionsCoordinator:
         req = WorkerRequest(
             kind="undo",
             paths=paths,
+            tag_mode=self._settings.tag_mode,
+            stored_tag_policy=self._settings.stored_tag_policy,
             wrap_gain=self._settings.wrap_gain,
             preserve_dates=self._settings.preserve_dates,
         )
@@ -297,14 +307,14 @@ class WindowActionsCoordinator:
 
     @safe_slot
     def _on_options(self) -> None:
-        from ..dialogs.options_dialog import OptionsDialog  # noqa: PLC0415
+        from ..dialogs.options_dialog import OptionsDialog
 
         dlg = OptionsDialog(self._settings, self._window)
         dlg.exec()
 
     @safe_slot
     def _on_about(self) -> None:
-        from ..dialogs.about_dialog import AboutDialog  # noqa: PLC0415
+        from ..dialogs.about_dialog import AboutDialog
 
         dlg = AboutDialog(self._window)
         dlg.exec()

@@ -8,7 +8,12 @@ from .math import (
     legacy_steps_to_db_approx,
     legacy_steps_to_db_exact,
 )
-from .processor import LegacyCommandResult, LegacyCompatOptions, LegacyExactProcessor
+from .processor import (
+    LegacyCommandResult,
+    LegacyCompatOptions,
+    LegacyExactProcessor,
+    StoredTagPolicy,
+)
 
 __all__ = [
     "LEGACY_DB_PER_STEP_APPROX",
@@ -16,6 +21,7 @@ __all__ = [
     "LegacyCommandResult",
     "LegacyCompatOptions",
     "LegacyExactProcessor",
+    "StoredTagPolicy",
     "db_to_legacy_steps",
     "legacy_round_to_int",
     "legacy_steps_to_db_approx",

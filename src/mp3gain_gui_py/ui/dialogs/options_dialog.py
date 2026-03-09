@@ -45,6 +45,11 @@ class OptionsDialog(QDialog):
         self._tag_mode.setCurrentText(settings.tag_mode)
         ui_form.addRow("Tag format:", self._tag_mode)
 
+        self._stored_tag_policy = QComboBox(self)
+        self._stored_tag_policy.addItems(["auto", "skip", "recalc", "check_only"])
+        self._stored_tag_policy.setCurrentText(settings.stored_tag_policy)
+        ui_form.addRow("Stored tag policy:", self._stored_tag_policy)
+
         self._folder_is_album = QCheckBox("Treat folder as album", self)
         self._folder_is_album.setChecked(settings.folder_is_album)
         ui_form.addRow(self._folder_is_album)
@@ -98,6 +103,7 @@ class OptionsDialog(QDialog):
         s = self._settings
         s.target_volume_db = self._target_volume.value()
         s.tag_mode = self._tag_mode.currentText()
+        s.stored_tag_policy = self._stored_tag_policy.currentText()
         s.folder_is_album = self._folder_is_album.isChecked()
         s.add_subfolders = self._add_subfolders.isChecked()
         s.preserve_dates = self._preserve_dates.isChecked()

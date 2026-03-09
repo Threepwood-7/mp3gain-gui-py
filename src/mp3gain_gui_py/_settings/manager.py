@@ -47,6 +47,7 @@ class SettingsManager(SettingsRegistry):
     # ── UI domain delegates ────────────────────────────────────────────────
     target_volume_db = _delegate_property("ui", "target_volume_db")
     tag_mode = _delegate_property("ui", "tag_mode")
+    stored_tag_policy = _delegate_property("ui", "stored_tag_policy")
     folder_is_album = _delegate_property("ui", "folder_is_album")
     add_subfolders = _delegate_property("ui", "add_subfolders")
     preserve_dates = _delegate_property("ui", "preserve_dates")

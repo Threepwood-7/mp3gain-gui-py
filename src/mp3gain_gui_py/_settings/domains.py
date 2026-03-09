@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from . import normalize as _norm
 from .registry import SettingsRegistry
-from .storage import SettingsStorage
+
+if TYPE_CHECKING:
+    from .storage import SettingsStorage
 
 
 class UiSettingsDomain(SettingsRegistry):
@@ -34,6 +38,24 @@ class UiSettingsDomain(SettingsRegistry):
     def tag_mode(self, value: str) -> None:
         v = value if value in self.ALLOWED_TAG_MODES else self.DEFAULT_TAG_MODE
         self._storage.set_value(self.TAG_MODE_KEY, v)
+
+    @property
+    def stored_tag_policy(self) -> str:
+        raw = _norm.normalize_str(
+            self._storage.value(self.STORED_TAG_POLICY_KEY, self.DEFAULT_STORED_TAG_POLICY),
+            self.DEFAULT_STORED_TAG_POLICY,
+        )
+        if raw in self.ALLOWED_STORED_TAG_POLICIES:
+            return raw
+        return self.DEFAULT_STORED_TAG_POLICY
+
+    @stored_tag_policy.setter
+    def stored_tag_policy(self, value: str) -> None:
+        if value in self.ALLOWED_STORED_TAG_POLICIES:
+            v = value
+        else:
+            v = self.DEFAULT_STORED_TAG_POLICY
+        self._storage.set_value(self.STORED_TAG_POLICY_KEY, v)
 
     @property
     def folder_is_album(self) -> bool:

@@ -9,6 +9,7 @@ class SettingsRegistry:
     # ── UI / display ───────────────────────────────────────────────────────
     TARGET_VOLUME_DB_KEY = "ui/target_volume_db"
     TAG_MODE_KEY = "ui/tag_mode"
+    STORED_TAG_POLICY_KEY = "ui/stored_tag_policy"
     FOLDER_IS_ALBUM_KEY = "ui/folder_is_album"
     ADD_SUBFOLDERS_KEY = "ui/add_subfolders"
     PRESERVE_DATES_KEY = "ui/preserve_dates"
@@ -29,6 +30,7 @@ class SettingsRegistry:
     # ── Defaults ───────────────────────────────────────────────────────────
     DEFAULT_TARGET_VOLUME_DB: float = 89.0
     DEFAULT_TAG_MODE: str = "apev2"
+    DEFAULT_STORED_TAG_POLICY: str = "auto"
     DEFAULT_FOLDER_IS_ALBUM: bool = True
     DEFAULT_ADD_SUBFOLDERS: bool = False
     DEFAULT_PRESERVE_DATES: bool = False
@@ -42,6 +44,9 @@ class SettingsRegistry:
     DEFAULT_LAST_ADD_FILES_DIR: str = ""
     DEFAULT_LAST_ADD_FOLDER_DIR: str = ""
     DEFAULT_WINDOW_GEOMETRY: bytes = b""
-    DEFAULT_COLUMN_WIDTHS: list[int] = []
+    DEFAULT_COLUMN_WIDTHS: tuple[int, ...] = ()
 
     ALLOWED_TAG_MODES: frozenset[str] = frozenset({"apev2", "id3"})
+    ALLOWED_STORED_TAG_POLICIES: frozenset[str] = frozenset(
+        {"auto", "skip", "recalc", "check_only"}
+    )

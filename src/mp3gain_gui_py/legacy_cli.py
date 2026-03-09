@@ -9,7 +9,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from ._legacy_exact import LegacyCompatOptions, LegacyExactProcessor, db_to_legacy_steps
+from ._legacy_exact import (
+    LegacyCompatOptions,
+    LegacyExactProcessor,
+    StoredTagPolicy,
+    db_to_legacy_steps,
+)
 from ._legacy_exact.math import legacy_steps_to_db_exact
 from ._tags.reader import read_tags
 
@@ -19,7 +24,12 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("files", nargs="+", help="Input MP3 files")
     parser.add_argument("-q", action="store_true", help="Quiet mode (supported)")
     parser.add_argument("-o", action="store_true", help="Print table output")
-    parser.add_argument("-s", dest="scan_mode", default="", help="Use 'c' to read stored tags only")
+    parser.add_argument(
+        "-s",
+        dest="scan_mode",
+        default="",
+        help="Stored tag policy: c=check_only, s=skip, r=recalc.",
+    )
     parser.add_argument("-r", action="store_true", help="Apply track gain")
     parser.add_argument("-u", action="store_true", help="Undo using MP3GAIN_UNDO")
     parser.add_argument("-k", action="store_true", help="Wrap gain values")
@@ -29,6 +39,17 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _scan_mode_to_policy(scan_mode: str) -> StoredTagPolicy:
+    mode = scan_mode.strip().lower()
+    if mode == "c":
+        return "check_only"
+    if mode == "s":
+        return "skip"
+    if mode == "r":
+        return "recalc"
+    return "auto"
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run legacy-compatible CLI argument handling and file operations.
 
@@ -36,10 +57,12 @@ def main(argv: list[str] | None = None) -> int:
     """
     args = _parse_args(argv)
     processor = LegacyExactProcessor()
+    stored_tag_policy = _scan_mode_to_policy(args.scan_mode)
     options = LegacyCompatOptions(
         wrap_gain=args.k,
         preserve_timestamp=args.p,
         tag_format="apev2",
+        stored_tag_policy=stored_tag_policy,
     )
 
     failures = 0
@@ -59,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"{path}\tERROR\t{result.message}")
             continue
 
-        if args.scan_mode.lower() == "c":
+        if stored_tag_policy == "check_only":
             tags = read_tags(path)
             track_gain = tags.track_gain_db if tags.track_gain_db is not None else 0.0
             steps = db_to_legacy_steps(track_gain, mp3_gain_mod=args.mp3_gain_mod)

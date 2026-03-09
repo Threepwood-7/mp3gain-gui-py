@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 
 from parity_common import (
     CODEX_89DB_DIR,
+    ORIGINAL_DIR,
     REFERENCE_89DB_DIR,
     SNAPSHOT_DIR,
     default_parity_jobs,
@@ -36,11 +37,11 @@ from mp3gain_gui_py._mp3.frame_parser import (
 
 if TYPE_CHECKING:
     from argparse import Namespace
-    from pathlib import Path
 
 TRACK_GAIN_TOLERANCE_DB = 0.01
 PEAK_TOLERANCE = 0.00002
 MAX_AMPLITUDE_TOLERANCE = PEAK_TOLERANCE * 32768.0
+LEGACY_PROFILES = ("skip_tags", "write_apev2", "write_id3")
 
 
 def _peek8_bits(data: bytes, byte_off: int, bit_off: int) -> int:
@@ -379,6 +380,30 @@ def _compare_one_file(
 def _parse_args() -> Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--original-dir",
+        type=Path,
+        default=ORIGINAL_DIR,
+        help="Directory containing original MP3 files (used for --mode full snapshot/build steps).",
+    )
+    parser.add_argument(
+        "--reference-dir",
+        type=Path,
+        default=REFERENCE_89DB_DIR,
+        help="Directory containing legacy 89 dB MP3 files.",
+    )
+    parser.add_argument(
+        "--codex-dir",
+        type=Path,
+        default=CODEX_89DB_DIR,
+        help="Directory containing codex-built MP3 files for compare output.",
+    )
+    parser.add_argument(
+        "--snapshot-dir",
+        type=Path,
+        default=SNAPSHOT_DIR,
+        help="Directory where parity JSON artifacts are written.",
+    )
+    parser.add_argument(
         "--mode",
         choices=("quick", "full"),
         default="quick",
@@ -400,25 +425,68 @@ def _parse_args() -> Namespace:
         action="store_true",
         help="Only for --mode full: force parity build to ignore cache.",
     )
+    parser.add_argument(
+        "--legacy-profile",
+        choices=LEGACY_PROFILES,
+        default="write_apev2",
+        help="Legacy profile passed to parity build in --mode full.",
+    )
     return parser.parse_args()
 
 
-def _run_step(command: list[str], *, cwd: Path) -> None:
+def _run_step(command: list[str], *, cwd: Path, allow_failure: bool = False) -> int:
     completed = subprocess.run(command, cwd=cwd, text=True, check=False)
-    if completed.returncode != 0:
+    if completed.returncode != 0 and not allow_failure:
         raise RuntimeError(f"Command failed ({completed.returncode}): {' '.join(command)}")
+    return completed.returncode
 
 
-def _run_full_pipeline(*, jobs: int, force_rebuild: bool) -> None:
+def _run_full_pipeline(
+    *,
+    jobs: int,
+    force_rebuild: bool,
+    original_dir: Path,
+    reference_dir: Path,
+    codex_dir: Path,
+    snapshot_dir: Path,
+    legacy_profile: str,
+) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     python_exe = sys.executable
 
-    _run_step([python_exe, "scripts/parity_oracle_snapshot.py"], cwd=repo_root)
+    _run_step(
+        [
+            python_exe,
+            "scripts/parity_oracle_snapshot.py",
+            "--original-dir",
+            str(original_dir),
+            "--reference-dir",
+            str(reference_dir),
+            "--snapshot-dir",
+            str(snapshot_dir),
+        ],
+        cwd=repo_root,
+    )
 
-    build_cmd = [python_exe, "scripts/parity_build_codex_89db.py", "--jobs", str(jobs)]
+    build_cmd = [
+        python_exe,
+        "scripts/parity_build_codex_89db.py",
+        "--original-dir",
+        str(original_dir),
+        "--codex-dir",
+        str(codex_dir),
+        "--snapshot-dir",
+        str(snapshot_dir),
+        "--legacy-profile",
+        legacy_profile,
+        "--jobs",
+        str(jobs),
+    ]
     if force_rebuild:
         build_cmd.append("--force-rebuild")
-    _run_step(build_cmd, cwd=repo_root)
+    build_rc = _run_step(build_cmd, cwd=repo_root, allow_failure=True)
+    if build_rc != 0:
+        print(f"WARN parity build step returned {build_rc}; continuing to compare generated outputs.")
 
 
 def main() -> int:
@@ -428,15 +496,28 @@ def main() -> int:
     """
     args = _parse_args()
     jobs = max(1, args.jobs)
+    original_dir = args.original_dir
+    reference_dir = args.reference_dir
+    codex_dir = args.codex_dir
+    snapshot_dir = args.snapshot_dir
+    legacy_profile = args.legacy_profile
 
     if args.mode == "full":
-        _run_full_pipeline(jobs=jobs, force_rebuild=args.force_rebuild)
+        _run_full_pipeline(
+            jobs=jobs,
+            force_rebuild=args.force_rebuild,
+            original_dir=original_dir,
+            reference_dir=reference_dir,
+            codex_dir=codex_dir,
+            snapshot_dir=snapshot_dir,
+            legacy_profile=legacy_profile,
+        )
 
-    SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
-    report_path = SNAPSHOT_DIR / "parity_compare_report.json"
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    report_path = snapshot_dir / "parity_compare_report.json"
 
-    reference_files = list_mp3_files(REFERENCE_89DB_DIR)
-    codex_files = list_mp3_files(CODEX_89DB_DIR)
+    reference_files = list_mp3_files(reference_dir)
+    codex_files = list_mp3_files(codex_dir)
     reference_map = {path.name: path for path in reference_files}
     codex_map = {path.name: path for path in codex_files}
 
@@ -493,7 +574,9 @@ def main() -> int:
 
     for name in common_names:
         entry = results_by_name[name]
-        file_item = entry["file_item"]
+        file_item = dict(entry["file_item"])
+        file_item["global_gain_ok"] = entry["global_gain_ok"]
+        file_item["container_ok"] = entry["container_ok"]
         file_report[name] = file_item
         suite = _suite_name(name)
         suite_counts[suite]["files"] += 1
@@ -553,6 +636,11 @@ def main() -> int:
     summary["byte_identical_files"] = byte_identical_files
     summary["mode"] = args.mode
     summary["strict"] = args.strict
+    summary["original_dir"] = str(original_dir)
+    summary["reference_dir"] = str(reference_dir)
+    summary["codex_dir"] = str(codex_dir)
+    summary["snapshot_dir"] = str(snapshot_dir)
+    summary["legacy_profile"] = legacy_profile
     summary["jobs_used"] = min(jobs, max(1, len(common_names)))
     summary["thresholds"] = {
         "track_gain_db": 0.0 if args.strict else TRACK_GAIN_TOLERANCE_DB,

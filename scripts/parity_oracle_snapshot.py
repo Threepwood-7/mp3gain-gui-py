@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from parity_common import (
@@ -17,7 +19,7 @@ from parity_common import (
 )
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from argparse import Namespace
 
 
 def _snapshot_for(directory: Path) -> dict[str, object]:
@@ -32,14 +34,42 @@ def _snapshot_for(directory: Path) -> dict[str, object]:
     }
 
 
+def _parse_args() -> Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--original-dir",
+        type=Path,
+        default=ORIGINAL_DIR,
+        help="Directory containing original MP3 files.",
+    )
+    parser.add_argument(
+        "--reference-dir",
+        type=Path,
+        default=REFERENCE_89DB_DIR,
+        help="Directory containing legacy 89 dB MP3 files.",
+    )
+    parser.add_argument(
+        "--snapshot-dir",
+        type=Path,
+        default=SNAPSHOT_DIR,
+        help="Directory where snapshot JSON will be written.",
+    )
+    return parser.parse_args()
+
+
 def main() -> int:
-    SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
-    output_path = SNAPSHOT_DIR / "parity_oracle_snapshot.json"
+    args = _parse_args()
+    snapshot_dir = args.snapshot_dir
+    original_dir = args.original_dir
+    reference_dir = args.reference_dir
+
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    output_path = snapshot_dir / "parity_oracle_snapshot.json"
 
     snapshot = {
         "created_at_utc": datetime.now(UTC).isoformat(),
-        "original": _snapshot_for(ORIGINAL_DIR),
-        "reference_89db": _snapshot_for(REFERENCE_89DB_DIR),
+        "original": _snapshot_for(original_dir),
+        "reference_89db": _snapshot_for(reference_dir),
     }
     output_path.write_text(json.dumps(snapshot, indent=2, sort_keys=True), encoding="utf-8")
 

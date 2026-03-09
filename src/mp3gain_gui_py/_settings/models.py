@@ -11,6 +11,7 @@ class UiSettings:
 
     target_volume_db: float = 89.0
     tag_mode: str = "apev2"           # "apev2" | "id3"
+    stored_tag_policy: str = "auto"   # "auto" | "skip" | "recalc" | "check_only"
     folder_is_album: bool = True
     add_subfolders: bool = False
     preserve_dates: bool = False

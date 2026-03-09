@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from .._engine.pcm_reader import decode_to_stereo_chunks, read_mp3_info
 from .._engine.replaygain import GainAnalyzer
 from .._mp3.file_info import scan_file, scan_max_amplitude
+from .._tags.reader import read_tags
 from .types import FileResult, WorkerRequest, WorkerResult
 
 if TYPE_CHECKING:
@@ -147,6 +148,17 @@ class AnalyzeWorker:
 
     def _analyze_track(self, path: Path, target_db: float) -> FileResult:
         """Full per-track analysis without album accumulation."""
+        policy = self._request.stored_tag_policy
+        if policy == "check_only":
+            tagged = self._analyze_track_from_tags(path, target_db)
+            if tagged is not None:
+                return tagged
+            return FileResult(path=path, ok=True, volume_db=target_db, track_gain_db=0.0)
+        if policy == "auto":
+            tagged = self._analyze_track_from_tags(path, target_db, allow_empty=True)
+            if tagged is not None:
+                return tagged
+
         sr = 44100
         try:
             sr, _ = read_mp3_info(path)
@@ -155,6 +167,41 @@ class AnalyzeWorker:
 
         ga = GainAnalyzer(sr)
         return self._analyze_track_with_ga(path, target_db, ga)
+
+    def _analyze_track_from_tags(
+        self,
+        path: Path,
+        target_db: float,
+        *,
+        allow_empty: bool = False,
+    ) -> FileResult | None:
+        try:
+            tags = read_tags(path)
+        except Exception as exc:
+            return FileResult(path=path, ok=False, error_msg=str(exc))
+
+        if allow_empty and tags.tag_format == "none":
+            return None
+
+        track_gain = tags.track_gain_db if tags.track_gain_db is not None else 0.0
+        max_amp = (tags.track_peak or 0.0) * 32768.0
+        min_g = tags.min_gain if tags.min_gain is not None else 0
+        max_g = tags.max_gain if tags.max_gain is not None else 0
+        volume_db = target_db - track_gain
+        clip_track = max_amp * _db_to_linear(track_gain) if max_amp else None
+        clipping = clip_track is not None and clip_track > 32767.0
+
+        return FileResult(
+            path=path,
+            ok=True,
+            volume_db=volume_db,
+            track_gain_db=track_gain,
+            max_amplitude=max_amp,
+            min_gain_field=min_g,
+            max_gain_field=max_g,
+            clipping=clipping,
+            clip_track=clip_track,
+        )
 
     def _analyze_track_with_ga(
         self, path: Path, target_db: float, ga: GainAnalyzer
