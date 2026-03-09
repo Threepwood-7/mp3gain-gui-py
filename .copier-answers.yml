@@ -1,0 +1,15 @@
+_commit: v1.7.2
+_src_path: c:/prj/aidev/py/aatemplate
+project_name: mp3gain-gui-py
+package_name: mp3gain_gui_py
+project_kind: qt_app
+description: PySide6 port of MP3Gain GUI - ReplayGain analysis and gain adjustment
+author_name: MT0z
+author_email: mt0z1@pir0z.yxz
+github_username: Threepwood-7
+project_version: 0.1.0
+runtime_dependencies:
+  - threep-commons @ git+https://github.com/Threepwood-7/threep-commons@v0.1.0
+  - PySide6>=6.10.2
+  - mutagen>=1.47
+  - miniaudio>=1.60
