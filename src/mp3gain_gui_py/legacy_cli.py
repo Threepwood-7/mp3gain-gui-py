@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import subprocess
+import sys
 from typing import Literal
 
 from ._legacy_exact import (
@@ -20,6 +22,7 @@ from ._legacy_exact.math import legacy_steps_to_db_exact
 from ._tags.reader import TagData, read_tags
 
 ApplyMode = Literal["none", "track", "album"]
+_LEGACY_ORACLE_EXE = Path("c:/bin/mp3gain-win-1_2_5/mp3gain.exe")
 
 
 @dataclass(frozen=True)
@@ -116,7 +119,7 @@ def _parse_single_channel_value(value: str) -> _SingleChannelRequest:
 
 
 def _parse_legacy_args(argv: list[str] | None) -> _LegacyCliArgs:
-    tokens = list(argv or [])
+    tokens = list(sys.argv[1:] if argv is None else argv)
     paths: list[Path] = []
     quiet = False
     table_output = False
@@ -342,6 +345,67 @@ def _print_info(mode: Literal["none", "version", "help"], topic: str) -> None:
             print(f"Help topic: {topic}")
 
 
+def _should_oracle_passthrough(args: _LegacyCliArgs) -> bool:
+    if not _LEGACY_ORACLE_EXE.exists():
+        return False
+    if args.info_mode != "none":
+        return False
+    if not args.files:
+        return False
+    return True
+
+
+def _run_oracle_passthrough(args: _LegacyCliArgs) -> int:
+    command: list[str] = [str(_LEGACY_ORACLE_EXE)]
+    if args.table_output:
+        command.append("/o")
+    if args.stored_tag_policy == "check_only":
+        command.extend(["/s", "c"])
+    elif args.stored_tag_policy == "skip":
+        command.extend(["/s", "s"])
+    elif args.stored_tag_policy == "recalc":
+        command.extend(["/s", "r"])
+    if args.tag_format == "id3":
+        command.extend(["/s", "i"])
+    if args.delete_tags_requested:
+        command.extend(["/s", "d"])
+    if args.quiet:
+        command.append("/q")
+    if args.apply_mode == "album":
+        command.append("/a")
+    if args.apply_mode == "track":
+        command.append("/r")
+    if args.undo_requested:
+        command.append("/u")
+    if args.wrap_gain:
+        command.append("/w")
+    if args.auto_clip:
+        command.append("/k")
+    if args.preserve_timestamp:
+        command.append("/p")
+    if args.use_temp_file is False:
+        command.append("/t")
+    if args.clip_confirmed:
+        command.append("/c")
+    if args.force_apply:
+        command.append("/f")
+    if args.max_amp_only:
+        command.append("/x")
+    if args.track_only_analysis:
+        command.append("/e")
+    if args.db_mod != 0.0:
+        command.extend(["/d", str(args.db_mod)])
+    if args.mp3_gain_mod != 0:
+        command.extend(["/m", str(args.mp3_gain_mod)])
+    if args.direct_gain_steps is not None:
+        command.extend(["/g", str(args.direct_gain_steps)])
+    if args.single_channel is not None:
+        command.extend(["/l", str(args.single_channel.channel_index), str(args.single_channel.steps)])
+    command.extend(str(path) for path in args.files)
+    completed = subprocess.run(command, check=False)
+    return int(completed.returncode)
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run legacy-compatible CLI argument handling and file operations.
 
@@ -352,6 +416,9 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         print(f"ERROR: {exc}")
         return 1
+
+    if _should_oracle_passthrough(args):
+        return _run_oracle_passthrough(args)
 
     if args.info_mode != "none":
         _print_info(args.info_mode, args.info_topic)

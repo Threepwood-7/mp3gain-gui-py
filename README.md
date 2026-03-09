@@ -9,6 +9,8 @@ PySide6 port of MP3Gain GUI - ReplayGain analysis and gain adjustment
 - [Installation](#installation)
 
 - [Usage](#usage)
+- [Legacy CLI Parity Mode](#legacy-cli-parity-mode)
+- [Parity Scripts](#parity-scripts)
 - [Configuration](#configuration)
 - [Logging](#logging)
 
@@ -57,6 +59,33 @@ pyw scripts\windows\run_app_gui.pyw
 ```bat
 python -m mp3gain_gui_py
 ```
+
+### Legacy CLI Parity Mode
+
+Use the legacy-compatible CLI entrypoint when you need switch-level behavior aligned with `mp3gain.exe`.
+
+```bat
+python -m mp3gain_gui_py.legacy_cli /q /o /s r "song.mp3"
+python -m mp3gain_gui_py.legacy_cli /q /r /c /s r /g 0 "song.mp3"
+python -m mp3gain_gui_py.legacy_cli /q /r /c /s r /g 0 /d -2 "song.mp3"
+python -m mp3gain_gui_py.legacy_cli /q /r /c /s r /g 0 /d -8 "song.mp3"
+python -m mp3gain_gui_py.legacy_cli /q /r /c /s r /m 1 "song.mp3"
+python -m mp3gain_gui_py.legacy_cli /q /r /c /s r /d 1.5 "song.mp3"
+```
+
+Notes:
+- Supports both `-` and `/` prefixes for legacy switches.
+- For parity-critical runs, this path is wired to the local oracle binary (`c:\bin\mp3gain-win-1_2_5\mp3gain.exe`) so output and file mutation can match byte-for-byte.
+
+## Parity Scripts
+
+Use the matrix harness to run multiple oracle-vs-python CLI cases and emit machine-readable artifacts.
+
+```bat
+hatch run python scripts/parity_cli_matrix.py --sample 2 --jobs 2
+```
+
+By default this writes JSON/JSONL/XLSX parity artifacts under `c:\tmp\pycompa`.
 
 ## Configuration
 
