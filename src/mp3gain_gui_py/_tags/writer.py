@@ -1,4 +1,10 @@
-"""Write or delete MP3Gain tags using mutagen."""
+"""Write or delete MP3Gain tags using mutagen.
+
+Legacy Pointers:
+- LEGACY_PTR:TAGS_APEV2_WRITE
+- LEGACY_PTR:TAGS_ID3_WRITE
+- LEGACY_PTR:TAGS_DELETE_KEYS
+"""
 
 from __future__ import annotations
 
@@ -19,6 +25,7 @@ from .formats import (
     format_peak,
     format_undo,
 )
+from .legacy_apev2 import delete_legacy_apev2_keys, write_legacy_apev2_tags
 from .reader import TagData
 
 
@@ -30,6 +37,8 @@ def write_tags(
 ) -> None:
     """Write all populated fields from *data* to *path*.
 
+    Legacy pointer: LEGACY_PTR:TAGS_APEV2_WRITE.
+
     Existing MP3Gain keys are replaced; other tags are preserved.
     """
     if tag_format == "apev2":
@@ -39,7 +48,10 @@ def write_tags(
 
 
 def delete_tags(path: Path) -> None:
-    """Remove all MP3Gain tag fields from *path* (both APEv2 and ID3v2)."""
+    """Remove all MP3Gain tag fields from *path* (both APEv2 and ID3v2).
+
+    Legacy pointer: LEGACY_PTR:TAGS_DELETE_KEYS.
+    """
     _delete_apev2_keys(path)
     _delete_id3_keys(path)
 
@@ -48,39 +60,21 @@ def delete_tags(path: Path) -> None:
 
 
 def _write_apev2(path: Path, data: TagData) -> None:
-    import mutagen.apev2 as _apev2  # type: ignore[import-untyped]
-
-    try:
-        tags = _apev2.APEv2(str(path))
-    except Exception:
-        tags = _apev2.APEv2()
-
-    kv = _build_kv(data)
-    for key, value in kv.items():
-        tags[key] = value
-
-    tags.save(str(path))
+    write_legacy_apev2_tags(path, data)
 
 
 def _delete_apev2_keys(path: Path) -> None:
-    try:
-        import mutagen.apev2 as _apev2  # type: ignore[import-untyped]
-        tags = _apev2.APEv2(str(path))
-        changed = False
-        for key in list(tags.keys()):
-            if key.upper() in ALL_MP3GAIN_KEYS:
-                del tags[key]
-                changed = True
-        if changed:
-            tags.save(str(path))
-    except Exception:
-        pass
+    delete_legacy_apev2_keys(path)
 
 
 # ── ID3v2 ──────────────────────────────────────────────────────────────────────
 
 
 def _write_id3(path: Path, data: TagData) -> None:
+    """Write MP3Gain keys to ID3v2 TXXX frames.
+
+    Legacy pointer: LEGACY_PTR:TAGS_ID3_WRITE.
+    """
     import mutagen.id3 as _id3  # type: ignore[import-untyped]
 
     try:

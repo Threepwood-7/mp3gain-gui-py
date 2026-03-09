@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from .._legacy_exact.math import db_to_legacy_steps
 from .._mp3.gain_writer import apply_gain_change, undo_gain_change
 from .._tags.reader import read_tags
 from .types import FileResult, WorkerRequest, WorkerResult
@@ -69,7 +70,7 @@ class GainWorker:
                 )
             else:
                 gain_db = self._gain_for(path)
-                steps = round(gain_db / 1.5)
+                steps = db_to_legacy_steps(gain_db)
                 apply_gain_change(
                     path,
                     steps,

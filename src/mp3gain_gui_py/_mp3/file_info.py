@@ -1,4 +1,9 @@
-"""Scan an MP3 file to collect min/max global_gain and max amplitude."""
+"""Scan an MP3 file to collect min/max global_gain and max amplitude.
+
+Legacy Pointers:
+- LEGACY_PTR:MP3_SCAN_FRAME_GAIN
+- LEGACY_PTR:MP3_SKIP_XING_INFO
+"""
 
 from __future__ import annotations
 
@@ -24,6 +29,8 @@ def _peek8_bits(data: bytes, byte_off: int, bit_off: int) -> int:
 
 def scan_file(path: Path) -> tuple[int, int]:
     """Return ``(min_global_gain, max_global_gain)`` across all frames.
+
+    Legacy pointer: LEGACY_PTR:MP3_SCAN_FRAME_GAIN.
 
     Mirrors scanFrameGain() from mp3gain.c.
     """

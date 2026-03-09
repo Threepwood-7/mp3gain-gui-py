@@ -1,5 +1,9 @@
 """Pure-Python Yule + Butterworth IIR filters.
 
+Legacy Pointers:
+- LEGACY_PTR:DSP_FILTER_YULE
+- LEGACY_PTR:DSP_FILTER_BUTTER
+
 Faithful translation of filterYule / filterButter from gain_analysis.c.
 The caller is responsible for maintaining pre-buffers (last MAX_ORDER samples
 of both input and output) across calls.
@@ -17,6 +21,8 @@ def filter_yule(
     kernel: tuple[float, ...],
 ) -> list[float]:
     """Apply 10th-order Yule IIR filter.
+
+    Legacy pointer: LEGACY_PTR:DSP_FILTER_YULE.
 
     Args:
         input_buf:  Pre-buffer (MAX_ORDER values) followed by n_samples current
@@ -67,6 +73,8 @@ def filter_butter(
     kernel: tuple[float, ...],
 ) -> list[float]:
     """Apply 2nd-order Butterworth IIR filter.
+
+    Legacy pointer: LEGACY_PTR:DSP_FILTER_BUTTER.
 
     Args:
         input_buf:  Pre-buffer (MAX_ORDER values) followed by n_samples current

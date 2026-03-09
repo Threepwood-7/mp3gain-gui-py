@@ -1,4 +1,8 @@
-"""Tag field name constants and format/parse helpers for MP3Gain tags."""
+"""Tag field name constants and format/parse helpers for MP3Gain tags.
+
+Legacy Pointers:
+- LEGACY_PTR:TAGS_FORMAT_CONTRACT
+"""
 
 from __future__ import annotations
 
@@ -25,12 +29,18 @@ ALL_MP3GAIN_KEYS: frozenset[str] = frozenset({
 # ── Formatters ─────────────────────────────────────────────────────────────────
 
 def format_gain(db: float) -> str:
-    """Format a gain value as ``+0.123456 dB`` (9-decimal, explicit sign)."""
+    """Format a gain value as ``+0.123456 dB`` (9-decimal, explicit sign).
+
+    Legacy pointer: LEGACY_PTR:TAGS_FORMAT_CONTRACT.
+    """
     return f"{db:+9.6f} dB"
 
 
 def format_peak(peak: float) -> str:
-    """Format a peak value as a bare 6-decimal float."""
+    """Format a peak value as a bare 6-decimal float.
+
+    Legacy pointer: LEGACY_PTR:TAGS_FORMAT_CONTRACT.
+    """
     return f"{peak:<8.6f}"
 
 

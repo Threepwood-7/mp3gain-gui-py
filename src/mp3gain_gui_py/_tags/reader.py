@@ -1,4 +1,9 @@
-"""Read MP3Gain tags from APEv2 or ID3v2 frames."""
+"""Read MP3Gain tags from APEv2 or ID3v2 frames.
+
+Legacy Pointers:
+- LEGACY_PTR:TAGS_APEV2_READ
+- LEGACY_PTR:TAGS_ID3_READ
+"""
 
 from __future__ import annotations
 
@@ -59,6 +64,8 @@ class TagData:
 
 def read_tags(path: Path) -> TagData:
     """Read MP3Gain tags from *path*, preferring APEv2 over ID3v2.
+
+    Legacy pointers: LEGACY_PTR:TAGS_APEV2_READ, LEGACY_PTR:TAGS_ID3_READ.
 
     Returns a :class:`TagData` with ``tag_format="none"`` if no tags are found.
     """

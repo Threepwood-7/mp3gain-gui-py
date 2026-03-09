@@ -1,11 +1,18 @@
 """Apply or undo global_gain changes frame-by-frame.
 
+Legacy Pointers:
+- LEGACY_PTR:MP3_CHANGE_GAIN
+- LEGACY_PTR:MP3_SKIP_XING_INFO
+- LEGACY_PTR:MP3_TEMPFILE_REPLACE
+
 Mirrors changeGain() from mp3gain.c.
 """
 
 from __future__ import annotations
 
 import os
+import stat
+import time
 from typing import TYPE_CHECKING
 
 from .frame_parser import (
@@ -46,6 +53,8 @@ def apply_gain_change(
     gain_delta_right: int | None = None,
 ) -> None:
     """Modify every frame's global_gain fields by ``gain_delta``.
+
+    Legacy pointer: LEGACY_PTR:MP3_CHANGE_GAIN.
 
     Args:
         path:               MP3 file to modify in-place (via temp file).
@@ -127,10 +136,10 @@ def apply_gain_change(
 
         pos += header.frame_size_bytes
 
-    # Write via temp file then rename
-    tmp = path.with_suffix(".TMP")
+    # Write via temp file then rename.
+    tmp = _legacy_tmp_path(path)
     tmp.write_bytes(bytes(data))
-    os.replace(tmp, path)
+    _replace_with_retry(tmp, path)
 
     if preserve_timestamp and mtime is not None:
         os.utime(path, (mtime, mtime))
@@ -149,6 +158,38 @@ def _recalc_crc(data: bytearray, frame_start: int, mpeg1: bool, mono: bool) -> N
         crc = crc16_update(data[frame_start + i], crc)
     data[frame_start + 4] = (crc >> 8) & 0xFF
     data[frame_start + 5] = crc & 0xFF
+
+
+def _legacy_tmp_path(path: Path) -> Path:
+    """Build legacy-compatible temp filename.
+
+    Legacy pointer: LEGACY_PTR:MP3_TEMPFILE_REPLACE.
+    """
+    name = path.name
+    if name.lower().endswith("tmp"):
+        return path.with_name(name + ".TMP")
+    if path.suffix:
+        return path.with_suffix(".TMP")
+    return path.with_name(name + ".TMP")
+
+
+def _replace_with_retry(tmp: Path, target: Path, *, retries: int = 5, delay_s: float = 0.05) -> None:
+    """Replace destination with bounded retries for transient Windows locks.
+
+    Legacy pointer: LEGACY_PTR:MP3_TEMPFILE_REPLACE.
+    """
+    last_error: OSError | None = None
+    for _attempt in range(retries):
+        try:
+            if target.exists():
+                os.chmod(target, stat.S_IREAD | stat.S_IWRITE)
+            os.replace(tmp, target)
+            return
+        except OSError as exc:
+            last_error = exc
+            time.sleep(delay_s)
+    if last_error is not None:
+        raise last_error
 
 
 def undo_gain_change(

@@ -1,6 +1,10 @@
-"""GainAnalyzer — faithful Python port of gain_analysis.c.
+"""GainAnalyzer - faithful Python port of gain_analysis.c.
 
-Original algorithm: David Robinson / Glen Sawyer — LGPL 2.1.
+Legacy Pointers:
+- LEGACY_PTR:DSP_ANALYZE_SAMPLES
+- LEGACY_PTR:DSP_GET_TITLE_GAIN
+
+Original algorithm: David Robinson / Glen Sawyer - LGPL 2.1.
 """
 
 from __future__ import annotations
@@ -97,6 +101,8 @@ class GainAnalyzer:
     ) -> None:
         """Feed PCM samples into the analyser.
 
+        Legacy pointer: LEGACY_PTR:DSP_ANALYZE_SAMPLES.
+
         Args:
             left:        Left-channel samples (or mono channel).
             right:       Right-channel samples.  Pass ``None`` for mono —
@@ -160,6 +166,8 @@ class GainAnalyzer:
 
     def get_title_gain(self) -> float:
         """Return recommended dB gain for all samples since last call.
+
+        Legacy pointer: LEGACY_PTR:DSP_GET_TITLE_GAIN.
 
         Merges track histogram into album histogram, then resets all
         per-track state (mirrors GetTitleGain in the C source).

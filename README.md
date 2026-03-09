@@ -124,6 +124,7 @@ mp3gain-gui-py/
 - Split large concerns into separate modules (actions/layout/operations/persistence/status) while preserving public imports.
 - Split GUI tests by feature domain instead of building one large end-to-end test file.
 - See `docs/architecture/qt_composition_playbook.md` for the reusable Qt decomposition workflow.
+- Legacy traceability map: `docs/architecture/legacy_pointer_map.md` (`LEGACY_PTR:` anchors in code map Python behavior to legacy C/VB6 references).
 
 ## Development
 

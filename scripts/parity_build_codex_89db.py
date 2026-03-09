@@ -1,4 +1,8 @@
-"""Build codex-normalized files for parity validation."""
+"""Build codex-normalized files for parity validation.
+
+Legacy Pointers:
+- LEGACY_PTR:PARITY_BUILD_89DB
+"""
 
 from __future__ import annotations
 
@@ -15,6 +19,8 @@ from typing import TYPE_CHECKING
 
 from parity_common import (
     CODEX_89DB_DIR,
+    LEGACY_ORACLE_EXE,
+    LEGACY_SOURCE_DIR,
     ORIGINAL_DIR,
     SNAPSHOT_DIR,
     SRC_DIR,
@@ -25,10 +31,13 @@ from parity_common import (
     sha256_file,
 )
 
-from mp3gain_gui_py._engine.pcm_reader import decode_to_stereo_chunks, read_mp3_info
-from mp3gain_gui_py._engine.replaygain import GainAnalyzer
+from mp3gain_gui_py._legacy_exact import (
+    LegacyCompatOptions,
+    LegacyExactProcessor,
+    db_to_legacy_steps,
+    legacy_steps_to_db_exact,
+)
 from mp3gain_gui_py._mp3.file_info import scan_file, scan_max_amplitude
-from mp3gain_gui_py._mp3.gain_writer import apply_gain_change
 from mp3gain_gui_py._tags.reader import TagData
 from mp3gain_gui_py._tags.writer import delete_tags, write_tags
 
@@ -50,24 +59,26 @@ if TYPE_CHECKING:
 
 
 def _analyze_track_gain_db(path: Path) -> float:
-    sample_rate, _channels = read_mp3_info(path)
-    analyzer = GainAnalyzer(sample_rate)
-    for _sr, left, right in decode_to_stereo_chunks(path, chunk_frames=8192):
-        analyzer.analyze_samples(left, right, len(left))
-    return analyzer.get_title_gain()
+    return LegacyExactProcessor().analyze_track_gain_db(path)
 
 
 def _build_one(src_path: Path, dst_path: Path) -> dict[str, object]:
+    """Build one codex output file from an original source input.
+
+    Legacy pointer: LEGACY_PTR:PARITY_BUILD_89DB.
+    """
     # copyfile avoids carrying over source read-only attributes on Windows.
     shutil.copyfile(src_path, dst_path)
     os.chmod(dst_path, stat.S_IREAD | stat.S_IWRITE)
     legacy_id3v1_tail = read_id3v1_tail(src_path)
 
+    processor = LegacyExactProcessor()
+    options = LegacyCompatOptions(wrap_gain=False, preserve_timestamp=False, tag_format="apev2")
     initial_gain_db = _analyze_track_gain_db(dst_path)
-    steps = round(initial_gain_db / 1.5)
-    applied_db = steps * 1.5
+    steps = db_to_legacy_steps(initial_gain_db)
+    applied_db = legacy_steps_to_db_exact(steps)
 
-    apply_gain_change(dst_path, steps, wrap=False, preserve_timestamp=False)
+    processor.apply_steps(dst_path, left_steps=steps, options=options)
 
     post_gain_db = _analyze_track_gain_db(dst_path)
     min_gain, max_gain = scan_file(dst_path)
@@ -181,6 +192,10 @@ def _parse_args() -> Namespace:
 
 
 def main() -> int:
+    """Run parallel codex 89 dB build for parity comparison.
+
+    Legacy pointer: LEGACY_PTR:PARITY_BUILD_89DB.
+    """
     args = _parse_args()
     SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
     CODEX_89DB_DIR.mkdir(parents=True, exist_ok=True)
@@ -279,6 +294,8 @@ def main() -> int:
     report_path = SNAPSHOT_DIR / "parity_build_codex_89db.json"
     report = {
         "target_db": TARGET_DB,
+        "legacy_oracle_exe": str(LEGACY_ORACLE_EXE),
+        "legacy_source_dir": str(LEGACY_SOURCE_DIR),
         "jobs_requested": jobs_requested,
         "jobs_used": jobs_used,
         "tool_signature_hash": signature_hash,

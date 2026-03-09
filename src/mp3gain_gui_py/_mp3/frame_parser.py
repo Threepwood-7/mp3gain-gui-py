@@ -1,5 +1,9 @@
 """MPEG Layer III frame header parsing and global_gain field location.
 
+Legacy Pointers:
+- LEGACY_PTR:MP3_FRAME_OFFSETS
+- LEGACY_PTR:MP3_SKIP_XING_INFO
+
 Bit-level logic mirrors scanFrameGain() / changeGain() from mp3gain.c.
 """
 
@@ -138,6 +142,8 @@ def find_next_frame(data: bytes, start: int) -> int:
 def global_gain_offsets(header: FrameHeader) -> list[tuple[int, int]]:
     """Return ``[(byte_offset, bit_offset), ...]`` for each global_gain field.
 
+    Legacy pointer: LEGACY_PTR:MP3_FRAME_OFFSETS.
+
     Offsets are relative to the start of the frame (i.e. include the 4-byte
     header and optional 2-byte CRC).
 
@@ -197,7 +203,10 @@ def global_gain_offsets(header: FrameHeader) -> list[tuple[int, int]]:
 
 
 def has_xing_or_info_tag(data: bytes, frame_offset: int, header: FrameHeader) -> bool:
-    """Return True if *header* frame carries a Xing/Info VBR header marker."""
+    """Return True if *header* frame carries a Xing/Info VBR header marker.
+
+    Legacy pointer: LEGACY_PTR:MP3_SKIP_XING_INFO.
+    """
     if header.mpeg_version == _MPEG1:
         sideinfo_len = 17 if header.num_channels == 1 else 32
     else:

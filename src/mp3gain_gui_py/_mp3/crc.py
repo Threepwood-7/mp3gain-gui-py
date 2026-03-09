@@ -1,5 +1,9 @@
 """CRC-16 calculation for protected MPEG frames.
 
+Legacy Pointers:
+- LEGACY_PTR:MP3_CRC_UPDATE
+- LEGACY_PTR:MP3_CRC_WRITE_HEADER
+
 Mirrors crcUpdate() / crcWriteHeader() from mp3gain.c.
 Polynomial: 0x8005.
 """
@@ -10,7 +14,10 @@ _POLYNOMIAL = 0x8005
 
 
 def crc16_update(value: int, crc: int) -> int:
-    """Feed one byte ``value`` into a running CRC-16 computation."""
+    """Feed one byte ``value`` into a running CRC-16 computation.
+
+    Legacy pointer: LEGACY_PTR:MP3_CRC_UPDATE.
+    """
     value <<= 8
     for _ in range(8):
         value <<= 1
@@ -45,6 +52,8 @@ def compute_frame_crc(frame: bytes | bytearray) -> int:
 
 def write_frame_crc(frame: bytearray, sideinfo_end: int) -> None:
     """Recalculate and write CRC into ``frame[4:6]``.
+
+    Legacy pointer: LEGACY_PTR:MP3_CRC_WRITE_HEADER.
 
     Args:
         frame:        Mutable frame buffer (modified in-place).

@@ -7,8 +7,8 @@ Developer notes, implementation decisions, and validation procedures.
 ## Project overview
 
 Pure-Python PySide6 port of MP3Gain (Glen Sawyer / David Robinson).
-Replaces the C engine (`mp3gain-1.6.2`) and VB6 GUI (`mp3gain-win-gui-1.3.4`)
-with a single Python package.  Target feature parity: VB6 GUI v1.3.4.
+Replaces the C engine (`mp3gain-1_5_2-src`) and VB6 GUI (`mp3gain-win-gui-1_2_5-src`)
+with a single Python package.  Target feature parity: VB6 GUI v1.2.5.
 
 - **Package:** `mp3gain_gui_py`
 - **Python:** 3.13
@@ -21,13 +21,19 @@ with a single Python package.  Target feature parity: VB6 GUI v1.3.4.
 
 | What | Path |
 |------|------|
-| ReplayGain DSP (C) | `C:/prj/misc/mp3gain/mp3gain-1_6_2-src/gain_analysis.c` |
-| MP3 frame manipulation (C) | `C:/prj/misc/mp3gain/mp3gain-1_6_2-src/mp3gain.c` |
-| APEv2 tag format (C) | `C:/prj/misc/mp3gain/mp3gain-1_6_2-src/apetag.c` |
-| ID3v2 tag format (C) | `C:/prj/misc/mp3gain/mp3gain-1_6_2-src/id3tag.c` |
-| VB6 UI spec | `C:/prj/misc/mp3gain/mp3gain-win-gui-1_3_4-src/frmMain.frm` |
+| ReplayGain DSP (C) | `C:/prj/misc/mp3gain/mp3gain-1_5_2-src/gain_analysis.c` |
+| MP3 frame manipulation (C) | `C:/prj/misc/mp3gain/mp3gain-1_5_2-src/mp3gain.c` |
+| APEv2 tag format (C) | `C:/prj/misc/mp3gain/mp3gain-1_5_2-src/apetag.c` |
+| ID3v2 tag format (C) | `C:/prj/misc/mp3gain/mp3gain-1_5_2-src/id3tag.c` |
+| VB6 UI spec | `C:/prj/misc/mp3gain/mp3gain-win-gui-1_2_5-src/frmMain.frm` |
 | Reference binary | `C:/bin/mp3gain-win-1_2_5/mp3gain.exe` |
 | Reference GUI | `C:/bin/mp3gain-win-1_2_5/MP3GainGUI.exe` |
+
+### Legacy pointer traceability
+
+- Canonical map: `docs/architecture/legacy_pointer_map.md`
+- Inline contract token: `LEGACY_PTR:<UPPER_SNAKE_ID>`
+- Use `rg -n "LEGACY_PTR:" src/mp3gain_gui_py scripts` to navigate Python-to-legacy anchors quickly.
 
 ---
 

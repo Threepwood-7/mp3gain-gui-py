@@ -1,4 +1,8 @@
-"""Shared helpers for MP3Gain parity scripts."""
+"""Shared helpers for MP3Gain parity scripts.
+
+Legacy Pointers:
+- LEGACY_PTR:PARITY_SHARED_PATHS
+"""
 
 from __future__ import annotations
 
@@ -14,7 +18,9 @@ if str(SRC_DIR) not in sys.path:
 
 from mp3gain_gui_py._tags.formats import ALL_MP3GAIN_KEYS  # noqa: E402
 
-MP3GAIN_EXE = Path("c:/bin/mp3gain-win-1_2_5/mp3gain.exe")
+LEGACY_ORACLE_EXE = Path("c:/bin/mp3gain-win-1_2_5/mp3gain.exe")
+LEGACY_SOURCE_DIR = Path("c:/prj/misc/mp3gain/mp3gain-1_5_2-src")
+MP3GAIN_EXE = LEGACY_ORACLE_EXE
 ORIGINAL_DIR = Path("c:/tmp/mp3/original")
 REFERENCE_89DB_DIR = Path("c:/tmp/mp3/89db")
 CODEX_89DB_DIR = Path("c:/tmp/mp3/89dbcodex")
@@ -90,6 +96,10 @@ def run_mp3gain_table(
     *,
     read_tag_only: bool = False,
 ) -> dict[str, dict[str, str]]:
+    """Run legacy oracle table output and parse rows.
+
+    Legacy pointer: LEGACY_PTR:PARITY_SHARED_PATHS.
+    """
     if not files:
         return {}
     command = [str(exe), "-q", "-o"]

@@ -1,5 +1,8 @@
 """IIR filter coefficient tables verbatim from gain_analysis.c.
 
+Legacy Pointers:
+- LEGACY_PTR:DSP_COEFFICIENT_TABLES
+
 Original: David Robinson, Glen Sawyer, Frank Klemm — LGPL 2.1
 """
 

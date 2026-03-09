@@ -1,4 +1,8 @@
-"""Compare codex output against mp3gain reference output."""
+"""Compare codex output against mp3gain reference output.
+
+Legacy Pointers:
+- LEGACY_PTR:PARITY_COMPARE_STRICT
+"""
 
 from __future__ import annotations
 
@@ -43,6 +47,106 @@ def _peek8_bits(data: bytes, byte_off: int, bit_off: int) -> int:
     word = (data[byte_off] << 8) | data[byte_off + 1]
     word >>= 8 - bit_off
     return word & 0xFF
+
+
+def _id3v2_end(data: bytes) -> int:
+    if len(data) < 10 or data[:3] != b"ID3":
+        return 0
+    id3_size = (
+        (data[9] & 0x7F)
+        | ((data[8] & 0x7F) << 7)
+        | ((data[7] & 0x7F) << 14)
+        | ((data[6] & 0x7F) << 21)
+    )
+    return min(len(data), 10 + id3_size)
+
+
+def _has_id3v1(data: bytes) -> bool:
+    return len(data) >= 128 and data[-128:-125] == b"TAG"
+
+
+def _find_trailer_start(data: bytes) -> int:
+    pos = len(data)
+    while True:
+        old = pos
+        if pos >= 128 and data[pos - 128 : pos - 125] == b"TAG":
+            pos -= 128
+            continue
+        if pos >= 15:
+            footer = data[pos - 15 : pos]
+            if footer[6:15] == b"LYRICS200" and footer[:6].isdigit():
+                lyrics_len = int(footer[:6])
+                start = pos - 15 - lyrics_len
+                if start >= 0 and data[start : start + 11] == b"LYRICSBEGIN":
+                    pos = start
+                    continue
+        if pos == old:
+            break
+    return pos
+
+
+def _ape_region_start(data: bytes) -> int | None:
+    trailer_start = _find_trailer_start(data)
+    if trailer_start < 32:
+        return None
+    footer = data[trailer_start - 32 : trailer_start]
+    if footer[:8] != b"APETAGEX":
+        return None
+    tag_length = int.from_bytes(footer[12:16], "little")
+    if tag_length < 32 or tag_length > trailer_start:
+        return None
+    return trailer_start - tag_length
+
+
+def _semantic_bucket(data: bytes, offset: int) -> str:
+    if offset < _id3v2_end(data):
+        return "container.id3v2"
+    if _has_id3v1(data) and offset >= len(data) - 128:
+        return "container.id3v1"
+    ape_start = _ape_region_start(data)
+    trailer_start = _find_trailer_start(data)
+    if ape_start is not None and ape_start <= offset < trailer_start:
+        return "metadata.apev2"
+    if offset >= trailer_start:
+        return "container.trailing_tags"
+    return "audio.mpeg_stream"
+
+
+def first_byte_mismatch(reference: Path, codex: Path) -> dict[str, object] | None:
+    ref = reference.read_bytes()
+    cod = codex.read_bytes()
+    shared = min(len(ref), len(cod))
+    for i in range(shared):
+        if ref[i] != cod[i]:
+            return {
+                "offset": i,
+                "reference_byte": ref[i],
+                "codex_byte": cod[i],
+                "semantic_bucket": _semantic_bucket(ref, i),
+            }
+    if len(ref) != len(cod):
+        longer = "reference" if len(ref) > len(cod) else "codex"
+        return {
+            "offset": shared,
+            "reason": "length_mismatch",
+            "longer_file": longer,
+            "reference_size": len(ref),
+            "codex_size": len(cod),
+            "semantic_bucket": _semantic_bucket(ref if longer == "reference" else cod, shared),
+        }
+    return None
+
+
+def _suite_name(filename: str) -> str:
+    stem = Path(filename).stem
+    if stem.isdigit():
+        value = int(stem)
+        if 1 <= value <= 7:
+            return "numeric_1_7"
+    upper = stem.upper()
+    if upper.startswith("M") and upper[1:].isdigit():
+        return "m_suite"
+    return "external_or_other"
 
 
 def _iter_frame_global_gain(data: bytes) -> list[tuple[int, list[int]]]:
@@ -92,6 +196,10 @@ def _iter_frame_global_gain(data: bytes) -> list[tuple[int, list[int]]]:
 
 
 def first_global_gain_mismatch(reference: Path, codex: Path) -> dict[str, object] | None:
+    """Return first frame-global_gain mismatch between oracle and codex outputs.
+
+    Legacy pointer: LEGACY_PTR:PARITY_COMPARE_STRICT.
+    """
     ref_rows = _iter_frame_global_gain(reference.read_bytes())
     codex_rows = _iter_frame_global_gain(codex.read_bytes())
 
@@ -250,6 +358,10 @@ def _compare_one_file(
     global_gain_mismatch = first_global_gain_mismatch(ref_path, codex_path)
     if global_gain_mismatch is not None:
         file_item["first_global_gain_mismatch"] = global_gain_mismatch
+    if ref_hash != codex_hash:
+        byte_mismatch = first_byte_mismatch(ref_path, codex_path)
+        if byte_mismatch is not None:
+            file_item["first_byte_mismatch"] = byte_mismatch
 
     ref_tags = read_raw_mp3gain_tags(ref_path)
     codex_tags = read_raw_mp3gain_tags(codex_path)
@@ -310,6 +422,10 @@ def _run_full_pipeline(*, jobs: int, force_rebuild: bool) -> None:
 
 
 def main() -> int:
+    """Run parity compare workflow and emit consolidated report.
+
+    Legacy pointer: LEGACY_PTR:PARITY_COMPARE_STRICT.
+    """
     args = _parse_args()
     jobs = max(1, args.jobs)
 
@@ -328,6 +444,7 @@ def main() -> int:
         "files": {},
         "table_mismatches": {},
         "tag_mismatches": {},
+        "suite_rollups": {},
         "summary": {},
         "statuses": {},
     }
@@ -335,6 +452,7 @@ def main() -> int:
     table_mismatches: dict[str, object] = report["table_mismatches"]  # type: ignore[assignment]
     tag_mismatches: dict[str, object] = report["tag_mismatches"]  # type: ignore[assignment]
     statuses: dict[str, str] = report["statuses"]  # type: ignore[assignment]
+    suite_rollups: dict[str, dict[str, int]] = report["suite_rollups"]  # type: ignore[assignment]
 
     common_names = sorted(set(reference_map) & set(codex_map))
     file_set_mismatch = sorted(reference_map) != sorted(codex_map)
@@ -365,16 +483,29 @@ def main() -> int:
     global_gain_fail = False
     container_fail = False
     metadata_fail = False
+    suite_tag_fail: dict[str, set[str]] = {"numeric_1_7": set(), "m_suite": set(), "external_or_other": set()}
+    suite_table_fail: dict[str, set[str]] = {"numeric_1_7": set(), "m_suite": set(), "external_or_other": set()}
+    suite_counts: dict[str, dict[str, int]] = {
+        "numeric_1_7": {"files": 0, "global_gain_fail": 0, "container_fail": 0, "hash_fail": 0},
+        "m_suite": {"files": 0, "global_gain_fail": 0, "container_fail": 0, "hash_fail": 0},
+        "external_or_other": {"files": 0, "global_gain_fail": 0, "container_fail": 0, "hash_fail": 0},
+    }
 
     for name in common_names:
         entry = results_by_name[name]
         file_item = entry["file_item"]
         file_report[name] = file_item
+        suite = _suite_name(name)
+        suite_counts[suite]["files"] += 1
 
         if entry["global_gain_ok"] is False:
             global_gain_fail = True
+            suite_counts[suite]["global_gain_fail"] += 1
         if entry["container_ok"] is False:
             container_fail = True
+            suite_counts[suite]["container_fail"] += 1
+        if file_item["hash_match"] is False:
+            suite_counts[suite]["hash_fail"] += 1
 
         tag_diff = entry["tag_diff"]
         if (
@@ -384,6 +515,7 @@ def main() -> int:
         ):
             metadata_fail = True
             tag_mismatches[name] = tag_diff
+            suite_tag_fail[suite].add(name)
 
     reference_table = run_mp3gain_table(reference_files, read_tag_only=True)
     codex_table = run_mp3gain_table(codex_files, read_tag_only=True)
@@ -392,10 +524,14 @@ def main() -> int:
         if key not in reference_table:
             metadata_fail = True
             table_mismatches[key] = {"missing_in_reference": codex_table[key]}
+            if key in reference_map or key in codex_map:
+                suite_table_fail[_suite_name(key)].add(key)
             continue
         if key not in codex_table:
             metadata_fail = True
             table_mismatches[key] = {"missing_in_codex": reference_table[key]}
+            if key in reference_map or key in codex_map:
+                suite_table_fail[_suite_name(key)].add(key)
             continue
         row_diff = _table_row_diff(reference_table[key], codex_table[key], strict=args.strict)
         if (
@@ -405,6 +541,8 @@ def main() -> int:
         ):
             metadata_fail = True
             table_mismatches[key] = row_diff
+            if key in reference_map or key in codex_map:
+                suite_table_fail[_suite_name(key)].add(key)
 
     summary: dict[str, object] = report["summary"]  # type: ignore[assignment]
     byte_identical_files = sum(
@@ -425,15 +563,50 @@ def main() -> int:
     audio_structure_ok = not file_set_mismatch and not global_gain_fail
     metadata_ok = not file_set_mismatch and not metadata_fail
     container_ok = not file_set_mismatch and not container_fail
-    overall_ok = audio_structure_ok and metadata_ok and container_ok
+    byte_identity_ok = byte_identical_files == len(common_names) and not file_set_mismatch
+    byte_identity_blocking = args.strict
+    overall_ok = (
+        audio_structure_ok
+        and metadata_ok
+        and container_ok
+        and ((not byte_identity_blocking) or byte_identity_ok)
+    )
 
     statuses["audio_structure_parity"] = "PASS" if audio_structure_ok else "FAIL"
     statuses["metadata_parity"] = "PASS" if metadata_ok else "FAIL"
     statuses["container_parity"] = "PASS" if container_ok else "FAIL"
     statuses["byte_identity"] = (
-        "PASS" if byte_identical_files == len(common_names) and not file_set_mismatch else "FAIL"
+        "PASS" if byte_identity_ok else "FAIL"
     )
+    summary["byte_identity_blocking"] = byte_identity_blocking
     summary["status"] = "PASS" if overall_ok else "FAIL"
+    summary["suite_gates"] = {
+        "numeric_1_7": "PASS"
+        if suite_counts["numeric_1_7"]["files"] > 0
+        and suite_counts["numeric_1_7"]["global_gain_fail"] == 0
+        and len(suite_tag_fail["numeric_1_7"]) == 0
+        and len(suite_table_fail["numeric_1_7"]) == 0
+        and suite_counts["numeric_1_7"]["hash_fail"] == 0
+        else "FAIL",
+        "m_suite": "PASS"
+        if suite_counts["m_suite"]["files"] > 0
+        and suite_counts["m_suite"]["global_gain_fail"] == 0
+        and len(suite_tag_fail["m_suite"]) == 0
+        and len(suite_table_fail["m_suite"]) == 0
+        and suite_counts["m_suite"]["hash_fail"] == 0
+        else "FAIL",
+        "combined": "PASS" if overall_ok else "FAIL",
+    }
+
+    for suite_name, counts in suite_counts.items():
+        suite_rollups[suite_name] = {
+            "files": counts["files"],
+            "global_gain_fail": counts["global_gain_fail"],
+            "container_fail": counts["container_fail"],
+            "hash_fail": counts["hash_fail"],
+            "tag_fail": len(suite_tag_fail[suite_name]),
+            "table_fail": len(suite_table_fail[suite_name]),
+        }
 
     report_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
 

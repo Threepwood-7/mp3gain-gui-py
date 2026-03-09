@@ -1,5 +1,9 @@
 """NumPy-accelerated Yule + Butterworth IIR filters.
 
+Legacy Pointers:
+- LEGACY_PTR:DSP_FILTER_YULE
+- LEGACY_PTR:DSP_FILTER_BUTTER
+
 Same signatures as filter_py; uses numpy arrays internally for faster
 floating-point arithmetic.  Falls back gracefully — callers should import
 from replaygain.py which selects the implementation at module load time.
@@ -18,7 +22,10 @@ def filter_yule(
     n_samples: int,
     kernel: tuple[float, ...],
 ) -> list[float]:
-    """NumPy-accelerated 10th-order Yule IIR filter (same contract as filter_py)."""
+    """NumPy-accelerated 10th-order Yule IIR filter (same contract as filter_py).
+
+    Legacy pointer: LEGACY_PTR:DSP_FILTER_YULE.
+    """
     k = np.asarray(kernel, dtype=np.float64)
     inp = np.empty(MAX_ORDER + n_samples, dtype=np.float64)
     inp[:MAX_ORDER] = input_buf[:MAX_ORDER]
@@ -63,7 +70,10 @@ def filter_butter(
     n_samples: int,
     kernel: tuple[float, ...],
 ) -> list[float]:
-    """NumPy-accelerated 2nd-order Butterworth IIR filter."""
+    """NumPy-accelerated 2nd-order Butterworth IIR filter.
+
+    Legacy pointer: LEGACY_PTR:DSP_FILTER_BUTTER.
+    """
     k = np.asarray(kernel, dtype=np.float64)
     inp = np.empty(MAX_ORDER + n_samples, dtype=np.float64)
     inp[:MAX_ORDER] = input_buf[:MAX_ORDER]

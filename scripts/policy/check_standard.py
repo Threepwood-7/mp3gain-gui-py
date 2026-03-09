@@ -109,6 +109,47 @@ REQUIRED_QT_NAMING_IGNORES = {
 }
 LEGAL_DISCLAIMER_START = "<!-- legal-disclaimer:start -->"
 LEGAL_DISCLAIMER_END = "<!-- legal-disclaimer:end -->"
+LEGACY_REFERENCE_EXCLUDE_FILES = {
+    "scripts/policy/check_standard.py",
+}
+LEGACY_REFERENCE_BANNED_PATTERNS = (
+    r"mp3gain-1_" + r"6_2-src",
+    r"mp3gain-win-gui-1_" + r"3_4-src",
+    r"mp3gain-1\." + r"6\.2",
+    r"mp3gain-win-gui-1\." + r"3\.4",
+    r"VB6 GUI v1\." + r"3\.4",
+)
+LEGACY_REFERENCE_CANONICAL_PATHS = (
+    Path(r"c:\prj\misc\mp3gain\mp3gain-1_5_2-src"),
+    Path(r"c:\prj\misc\mp3gain\mp3gain-win-gui-1_2_5-src"),
+    Path(r"c:\bin\mp3gain-win-1_2_5\mp3gain.exe"),
+    Path(r"c:\bin\mp3gain-win-1_2_5\MP3GainGUI.exe"),
+)
+LEGACY_POINTER_MAP_REL = Path("docs/architecture/legacy_pointer_map.md")
+LEGACY_POINTER_TOKEN_RE = re.compile(r"LEGACY_PTR:[A-Z0-9_]+")
+LEGACY_POINTER_LEGACY_REF_RE = re.compile(
+    r"^[A-Za-z0-9_./-]+:[A-Za-z_][A-Za-z0-9_]*@L\d+-L\d+$"
+)
+LEGACY_POINTER_REQUIRED_FILES = (
+    "src/mp3gain_gui_py/_engine/coefficients.py",
+    "src/mp3gain_gui_py/_engine/filter_py.py",
+    "src/mp3gain_gui_py/_engine/filter_np.py",
+    "src/mp3gain_gui_py/_engine/replaygain.py",
+    "src/mp3gain_gui_py/_mp3/crc.py",
+    "src/mp3gain_gui_py/_mp3/file_info.py",
+    "src/mp3gain_gui_py/_mp3/frame_parser.py",
+    "src/mp3gain_gui_py/_mp3/gain_writer.py",
+    "src/mp3gain_gui_py/_tags/formats.py",
+    "src/mp3gain_gui_py/_tags/reader.py",
+    "src/mp3gain_gui_py/_tags/legacy_apev2.py",
+    "src/mp3gain_gui_py/_tags/writer.py",
+    "src/mp3gain_gui_py/_legacy_exact/math.py",
+    "src/mp3gain_gui_py/_legacy_exact/processor.py",
+    "src/mp3gain_gui_py/legacy_cli.py",
+    "scripts/parity_common.py",
+    "scripts/parity_build_codex_89db.py",
+    "scripts/parity_compare.py",
+)
 SILENT_BROAD_EXCEPT_RE = re.compile(
     r"except\s+Exception(?:\s+as\s+[A-Za-z_][A-Za-z0-9_]*)?\s*:\s*(?:#.*\n\s*)?pass\b",
     flags=re.MULTILINE,
@@ -474,6 +515,157 @@ def collect_structure_size_guidance(
         )
 
 
+def collect_legacy_reference_errors(
+    repo_root: Path,
+    tracked: list[str],
+    errors: list[str],
+) -> None:
+    patterns = [re.compile(pattern, flags=re.IGNORECASE) for pattern in LEGACY_REFERENCE_BANNED_PATTERNS]
+    for rel in tracked:
+        if rel in LEGACY_REFERENCE_EXCLUDE_FILES:
+            continue
+        if to_suffix(rel) not in TEXT_SUFFIXES:
+            continue
+        abs_path = repo_root / rel
+        try:
+            content = abs_path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for pattern in patterns:
+            if pattern.search(content):
+                errors.append(
+                    "Legacy path reference policy: stale reference "
+                    f"'{pattern.pattern}' found in {rel}"
+                )
+
+
+def collect_legacy_path_sanity_warnings(warnings: list[str]) -> None:
+    if not sys.platform.lower().startswith("win"):
+        warnings.append(
+            "Legacy path sanity check skipped on non-Windows host."
+        )
+        return
+    for canonical in LEGACY_REFERENCE_CANONICAL_PATHS:
+        if not canonical.exists():
+            warnings.append(
+                f"Legacy path sanity: expected local oracle/source path not found: {canonical}"
+            )
+
+
+def _is_pointer_scan_target(rel: str) -> bool:
+    return (rel.startswith("src/") or rel.startswith("scripts/")) and rel.endswith(".py")
+
+
+def _parse_legacy_pointer_map(
+    repo_root: Path,
+    warnings: list[str],
+) -> dict[str, str]:
+    path = repo_root / LEGACY_POINTER_MAP_REL
+    if not path.exists():
+        warnings.append(
+            f"Legacy pointer guidance: missing map file {LEGACY_POINTER_MAP_REL.as_posix()}."
+        )
+        return {}
+
+    try:
+        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    except OSError as exc:
+        warnings.append(f"Legacy pointer guidance: unable to read map file ({exc}).")
+        return {}
+
+    pointer_to_legacy_ref: dict[str, str] = {}
+    for line_num, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if not stripped.startswith("| LEGACY_PTR:"):
+            continue
+        columns = [part.strip() for part in stripped.strip("|").split("|")]
+        if len(columns) < 6:
+            warnings.append(
+                "Legacy pointer guidance: malformed map row "
+                f"(expected 6 columns) at {LEGACY_POINTER_MAP_REL}:{line_num}."
+            )
+            continue
+        pointer_id = columns[0].strip("` ")
+        legacy_ref = columns[2].strip("` ")
+
+        if not LEGACY_POINTER_TOKEN_RE.fullmatch(pointer_id):
+            warnings.append(
+                "Legacy pointer guidance: malformed pointer_id "
+                f"'{pointer_id}' at {LEGACY_POINTER_MAP_REL}:{line_num}."
+            )
+            continue
+        if pointer_id in pointer_to_legacy_ref:
+            warnings.append(
+                "Legacy pointer guidance: duplicate pointer_id "
+                f"'{pointer_id}' at {LEGACY_POINTER_MAP_REL}:{line_num}."
+            )
+            continue
+        if not LEGACY_POINTER_LEGACY_REF_RE.fullmatch(legacy_ref):
+            warnings.append(
+                "Legacy pointer guidance: malformed legacy_ref "
+                f"'{legacy_ref}' at {LEGACY_POINTER_MAP_REL}:{line_num}."
+            )
+        pointer_to_legacy_ref[pointer_id] = legacy_ref
+
+    return pointer_to_legacy_ref
+
+
+def collect_legacy_pointer_warnings(
+    repo_root: Path,
+    tracked: list[str],
+    warnings: list[str],
+) -> None:
+    pointer_map = _parse_legacy_pointer_map(repo_root, warnings)
+    map_ids = set(pointer_map)
+
+    code_ids: set[str] = set()
+    tracked_set = set(tracked)
+    required_set = set(LEGACY_POINTER_REQUIRED_FILES)
+
+    def _scan_file(rel: str) -> set[str]:
+        abs_path = repo_root / rel
+        try:
+            content = abs_path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            return set()
+        return set(LEGACY_POINTER_TOKEN_RE.findall(content))
+
+    for rel in LEGACY_POINTER_REQUIRED_FILES:
+        abs_path = repo_root / rel
+        if not abs_path.exists():
+            warnings.append(
+                "Legacy pointer guidance: required parity-critical module "
+                f"is missing: {rel}"
+            )
+            continue
+        found = _scan_file(rel)
+        if not found:
+            warnings.append(
+                "Legacy pointer guidance: parity-critical module missing "
+                f"LEGACY_PTR token: {rel}"
+            )
+        code_ids.update(found)
+
+    for rel in tracked:
+        if rel in required_set or not _is_pointer_scan_target(rel):
+            continue
+        code_ids.update(_scan_file(rel))
+
+    unknown_ids = sorted(code_ids - map_ids)
+    for pointer_id in unknown_ids:
+        warnings.append(
+            "Legacy pointer guidance: code references unknown pointer_id "
+            f"'{pointer_id}' not present in {LEGACY_POINTER_MAP_REL.as_posix()}."
+        )
+
+    unreferenced_ids = sorted(map_ids - code_ids)
+    for pointer_id in unreferenced_ids:
+        warnings.append(
+            "Legacy pointer guidance: map pointer_id is currently unreferenced "
+            f"in code: '{pointer_id}'."
+        )
+
+
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[2]
     errors: list[str] = []
@@ -746,6 +938,9 @@ def main() -> int:
     collect_silent_broad_exception_warnings(repo_root, tracked, warnings)
     collect_structure_size_guidance(repo_root, tracked, warnings)
     collect_docstring_guidance(repo_root, tracked, warnings)
+    collect_legacy_reference_errors(repo_root, tracked, errors)
+    collect_legacy_path_sanity_warnings(warnings)
+    collect_legacy_pointer_warnings(repo_root, tracked, warnings)
 
     if errors:
         print("Project policy check failed with the following issues:", file=sys.stderr)
