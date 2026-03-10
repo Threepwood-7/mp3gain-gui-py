@@ -86,6 +86,20 @@ class OptionsDialog(QDialog):
         self._reckless_mode.setChecked(settings.reckless_mode)
         ops_form.addRow(self._reckless_mode)
 
+        self._force_apply_normalization = QCheckBox(
+            "Force analyze+normalize on apply (track+album)",
+            self,
+        )
+        self._force_apply_normalization.setChecked(settings.force_apply_normalization)
+        ops_form.addRow(self._force_apply_normalization)
+
+        self._apply_zero_step = QCheckBox(
+            "Apply even when computed step is 0",
+            self,
+        )
+        self._apply_zero_step.setChecked(settings.apply_zero_step)
+        ops_form.addRow(self._apply_zero_step)
+
         # ── Dialog buttons ─────────────────────────────────────────────────
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
@@ -112,5 +126,7 @@ class OptionsDialog(QDialog):
         s.warn_on_clip = self._warn_on_clip.isChecked()
         s.wrap_gain = self._wrap_gain.isChecked()
         s.reckless_mode = self._reckless_mode.isChecked()
+        s.force_apply_normalization = self._force_apply_normalization.isChecked()
+        s.apply_zero_step = self._apply_zero_step.isChecked()
         s.sync()
         self.accept()

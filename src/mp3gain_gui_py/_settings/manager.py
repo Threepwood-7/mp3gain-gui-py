@@ -58,6 +58,8 @@ class SettingsManager(SettingsRegistry):
     # ── Ops domain delegates ───────────────────────────────────────────────
     wrap_gain = _delegate_property("ops", "wrap_gain")
     reckless_mode = _delegate_property("ops", "reckless_mode")
+    force_apply_normalization = _delegate_property("ops", "force_apply_normalization")
+    apply_zero_step = _delegate_property("ops", "apply_zero_step")
 
     # ── Session domain delegates ───────────────────────────────────────────
     last_add_files_dir = _delegate_property("session", "last_add_files_dir")

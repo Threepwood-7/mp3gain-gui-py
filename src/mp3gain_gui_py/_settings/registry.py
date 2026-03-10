@@ -20,6 +20,8 @@ class SettingsRegistry:
     # ── Operations ─────────────────────────────────────────────────────────
     WRAP_GAIN_KEY = "ops/wrap_gain"
     RECKLESS_MODE_KEY = "ops/reckless_mode"
+    FORCE_APPLY_NORMALIZATION_KEY = "ops/force_apply_normalization"
+    APPLY_ZERO_STEP_KEY = "ops/apply_zero_step"
 
     # ── Session ────────────────────────────────────────────────────────────
     LAST_ADD_FILES_DIR_KEY = "session/last_add_files_dir"
@@ -40,6 +42,8 @@ class SettingsRegistry:
 
     DEFAULT_WRAP_GAIN: bool = False
     DEFAULT_RECKLESS_MODE: bool = False
+    DEFAULT_FORCE_APPLY_NORMALIZATION: bool = True
+    DEFAULT_APPLY_ZERO_STEP: bool = False
 
     DEFAULT_LAST_ADD_FILES_DIR: str = ""
     DEFAULT_LAST_ADD_FOLDER_DIR: str = ""

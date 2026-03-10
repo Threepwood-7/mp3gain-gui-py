@@ -11,6 +11,7 @@ from .._tags.reader import read_tags
 from .types import FileResult, StoredTagPolicy
 
 _PROCESSOR: LegacyExactProcessor | None = None
+_LEGACY_TARGET_DB = 89.0
 
 
 def _get_processor() -> LegacyExactProcessor:
@@ -22,6 +23,10 @@ def _get_processor() -> LegacyExactProcessor:
 
 def _db_to_linear(db: float) -> float:
     return math.pow(10.0, db / 20.0)
+
+
+def _target_offset_steps(target_db: float) -> int:
+    return db_to_legacy_steps(target_db - _LEGACY_TARGET_DB)
 
 
 def _analyze_track_from_tags(
@@ -125,6 +130,10 @@ def gain_file_task(
     constant_db: float,
     wrap_gain: bool,
     preserve_dates: bool,
+    target_db: float = _LEGACY_TARGET_DB,
+    force_apply_normalization: bool = False,
+    apply_zero_step: bool = False,
+    forced_steps: int | None = None,
 ) -> FileResult:
     path = Path(path_text)
     options = LegacyCompatOptions(
@@ -140,11 +149,28 @@ def gain_file_task(
                 return FileResult(path=path, ok=False, error_msg=result.message)
             return FileResult(path=path, ok=True)
 
-        if kind == "apply_constant":
+        if force_apply_normalization and kind == "apply_track":
+            analyzed_gain_db, _max_amp, _min_gain, _max_gain = processor.analyze_track_metrics(
+                path,
+                include_gain=True,
+            )
+            analyzed_steps = db_to_legacy_steps(analyzed_gain_db)
+            steps = analyzed_steps + _target_offset_steps(target_db)
+        elif force_apply_normalization and kind == "apply_album":
+            if forced_steps is None:
+                return FileResult(
+                    path=path,
+                    ok=False,
+                    error_msg="Album analysis failed before apply normalization.",
+                )
+            steps = forced_steps
+        elif kind == "apply_constant":
             gain_db = constant_db
+            steps = db_to_legacy_steps(gain_db)
         elif kind == "apply_track":
             tags = read_tags(path)
             gain_db = tags.track_gain_db if tags.track_gain_db is not None else 0.0
+            steps = db_to_legacy_steps(gain_db)
         elif kind == "apply_album":
             tags = read_tags(path)
             if tags.album_gain_db is not None:
@@ -153,10 +179,18 @@ def gain_file_task(
                 gain_db = tags.track_gain_db
             else:
                 gain_db = 0.0
+            steps = db_to_legacy_steps(gain_db)
         else:
             return FileResult(path=path, ok=False, error_msg=f"Unsupported gain task kind: {kind}")
 
-        steps = db_to_legacy_steps(gain_db)
+        if (
+            force_apply_normalization
+            and kind in {"apply_track", "apply_album"}
+            and steps == 0
+            and not apply_zero_step
+        ):
+            return FileResult(path=path, ok=True)
+
         result = processor.apply_steps(
             path,
             left_steps=steps,

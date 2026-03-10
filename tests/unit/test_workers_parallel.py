@@ -8,6 +8,7 @@ import mp3gain_gui_py._workers.analyze_worker as analyze_worker_mod
 import mp3gain_gui_py._workers.gain_worker as gain_worker_mod
 import mp3gain_gui_py._workers.tag_worker as tag_worker_mod
 from _pytest.monkeypatch import MonkeyPatch
+from mp3gain_gui_py._legacy_exact.math import db_to_legacy_steps
 from mp3gain_gui_py._workers.analyze_worker import AnalyzeWorker
 from mp3gain_gui_py._workers.gain_worker import GainWorker
 from mp3gain_gui_py._workers.tag_worker import TagWorker
@@ -173,3 +174,59 @@ def test_tag_worker_uses_process_pool(monkeypatch: MonkeyPatch) -> None:
     assert _FakeProcessPoolExecutor.instances[0].max_workers == len(paths)
     for _fn, _args, kwargs in _FakeProcessPoolExecutor.instances[0].submitted:
         assert kwargs.get("tag_mode") == "apev2"
+
+
+def test_gain_worker_forced_album_normalization_precomputes_group_steps(monkeypatch: MonkeyPatch) -> None:
+    paths = [
+        Path(r"C:\tmp\a\one.mp3"),
+        Path(r"C:\tmp\a\two.mp3"),
+        Path(r"C:\tmp\b\three.mp3"),
+    ]
+    req = WorkerRequest(
+        kind="apply_album",
+        paths=paths,
+        album_groups={
+            str(paths[0].parent): [paths[0], paths[1]],
+            str(paths[2].parent): [paths[2]],
+        },
+        target_db=87.0,
+        force_apply_normalization=True,
+    )
+    bridge = _FakeBridge()
+    worker = GainWorker(req, bridge)
+
+    _FakeProcessPoolExecutor.instances.clear()
+    monkeypatch.setattr(gain_worker_mod.os, "cpu_count", lambda: 4)
+    monkeypatch.setattr(gain_worker_mod, "ProcessPoolExecutor", _FakeProcessPoolExecutor)
+
+    def _fake_album_group_gain_task(path_texts: tuple[str, ...], *, max_amp_only: bool) -> tuple[tuple[str, ...], float | None]:
+        _ = max_amp_only
+        first = Path(path_texts[0]).parent.name.lower()
+        gain = 3.010299956639812 if first == "a" else -3.010299956639812
+        return path_texts, gain
+
+    monkeypatch.setattr(gain_worker_mod, "album_group_gain_task", _fake_album_group_gain_task)
+    monkeypatch.setattr(
+        gain_worker_mod,
+        "gain_file_task",
+        lambda kind, path_text, **kwargs: FileResult(path=Path(path_text), ok=True),
+    )
+
+    worker.run()
+
+    assert bridge.summary is not None
+    assert bridge.summary.succeeded == len(paths)
+    assert bridge.summary.failed == 0
+    assert len(_FakeProcessPoolExecutor.instances) == 2
+
+    apply_executor = _FakeProcessPoolExecutor.instances[1]
+    submitted_by_path = {
+        Path(args[1]): kwargs
+        for _fn, args, kwargs in apply_executor.submitted
+    }
+    expected_a = db_to_legacy_steps(3.010299956639812) + db_to_legacy_steps(87.0 - 89.0)
+    expected_b = db_to_legacy_steps(-3.010299956639812) + db_to_legacy_steps(87.0 - 89.0)
+    assert submitted_by_path[paths[0]]["forced_steps"] == expected_a
+    assert submitted_by_path[paths[1]]["forced_steps"] == expected_a
+    assert submitted_by_path[paths[2]]["forced_steps"] == expected_b
+    assert submitted_by_path[paths[0]]["force_apply_normalization"] is True

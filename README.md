@@ -11,6 +11,7 @@ PySide6 port of MP3Gain GUI - ReplayGain analysis and gain adjustment
 - [Usage](#usage)
 - [Normalize Helper](#normalize-helper)
 - [What Is ReplayGain?](#what-is-replaygain)
+- [GUI Usage](#gui-usage)
 - [Legacy CLI](#legacy-cli)
 - [Legacy C Source Comparison (1.5.2 vs 1.6.2)](#legacy-c-source-comparison-152-vs-162)
 - [Legacy VB6 Source Comparison (1.2.5 vs 1.3.4)](#legacy-vb6-source-comparison-125-vs-134)
@@ -209,6 +210,78 @@ ReplayGain can be applied in two broad ways:
 Important distinctions from the original MP3Gain FAQ:
 - ReplayGain is not peak normalization. Two files can have similar peaks but very different perceived loudness.
 - MP3Gain-style volume changes do not decode and re-encode MP3 audio. Volume is adjusted via MP3 gain fields, so repeated adjustments do not add transcoding loss.
+
+## GUI Usage
+
+The GUI is the primary workflow for day-to-day processing. It is designed to be fast on large file sets:
+
+- runtime operations are DLL-backed (vendored legacy C backend),
+- file work is parallelized through a process pool,
+- worker count is auto-sized to logical CPU count (`min(cpu_count, file_count)`).
+
+In practice, that means analysis/apply/delete actions process many files concurrently and usually complete much faster than single-threaded legacy flows.
+
+### Typical Workflow
+
+1. Launch the app:
+
+```bat
+pyw scripts\windows\run_app_gui.pyw
+```
+
+2. Add files or a folder:
+- `Add Files...` for explicit file selection.
+- `Add Folder...` for bulk import (`Include subfolders` is controlled in Options).
+
+3. Set target loudness:
+- Use `Target volume (dB)` in the main window (default `89.0`).
+
+4. Analyze:
+- `Track Analysis`: per-file gain/peak metrics.
+- `Album Analysis`: computes album-group metrics and merges them into each file row.
+
+5. Apply changes:
+- `Apply Track Gain`
+- `Apply Album Gain`
+- `Apply Constant Gain...`
+- `Undo Gain Change`
+- `Delete Tags`
+
+6. Watch progress/status:
+- Per-file completion updates table rows.
+- Progress bar and status text are updated while workers run.
+- `Cancel` stops new submissions and cancels pending work.
+
+### Parallel Execution Model (Why It Is Fast)
+
+- `Track Analysis`, `Album Analysis`, `Apply`, and `Delete Tags` use `ProcessPoolExecutor`.
+- Each file is processed in its own task; multiple tasks run at once up to CPU capacity.
+- Album analysis/apply uses a two-phase model:
+  1. per-group album metric computation,
+  2. per-file execution with merged group result.
+- C-backend calls happen inside worker processes, which avoids a single global Python thread bottleneck.
+
+### Forced Normalize-on-Apply (Track + Album)
+
+The GUI has two options in `Options -> Gain Writing`:
+
+- `Force analyze+normalize on apply (track+album)` (default: enabled)
+- `Apply even when computed step is 0` (default: disabled)
+
+With forced mode enabled, apply actions do not trust stored tags for gain derivation. They recalculate from audio and then apply explicit legacy steps:
+
+- Track apply per file:
+  - analyze track gain from audio,
+  - `analyzed_steps = db_to_legacy_steps(analyzed_track_gain_db)`,
+  - `final_steps = analyzed_steps + db_to_legacy_steps(target_volume_db - 89.0)`,
+  - if `final_steps == 0`, apply is skipped unless `Apply even when computed step is 0` is enabled.
+
+- Album apply per group:
+  - compute one album gain from audio for each folder group,
+  - convert that to steps using the same offset formula,
+  - apply that group step result to each file in the group.
+
+With forced mode disabled, GUI apply falls back to tag-driven behavior (`track_gain_db` / `album_gain_db`) for compatibility.
 
 ## Legacy CLI
 
@@ -584,6 +657,32 @@ Application identity is defined in `src/mp3gain_gui_py/constants.py` and passed 
 - configure QSettings with `threep_commons.paths.configure_qsettings(APP_IDENTITY, config_dir_override=...)`
 - resolve runtime storage with `threep_commons.paths.resolve_app_data_dir(APP_IDENTITY, override_dir=...)`
 - use `CONFIG_DIR` and `DATA_DIR` for environment overrides
+
+### Forced Normalize-on-Apply (GUI + INI)
+
+GUI `Apply Track Gain` and `Apply Album Gain` now support a persisted forced-normalization mode aligned with `scripts/run_normalize.py`.
+
+INI keys:
+
+| Key | Default | Effect |
+|---|---:|---|
+| `ops/force_apply_normalization` | `true` | Re-analyzes audio during apply and computes steps from fresh analysis, instead of using stored tag gain values. |
+| `ops/apply_zero_step` | `false` | Controls whether files with computed final step `0` are still sent to apply (`true`) or treated as successful no-op (`false`). |
+
+Options dialog checkboxes:
+
+- `Force analyze+normalize on apply (track+album)`
+- `Apply even when computed step is 0`
+
+When forced mode is enabled:
+
+- Track apply computes `analyzed_steps = db_to_legacy_steps(analyzed_track_gain_db)`.
+- Album apply computes one album gain per folder group first, then maps that step result to each file in the group.
+- Both use:
+  - `final_steps = analyzed_steps + db_to_legacy_steps(target_volume_db - 89.0)`
+- If `final_steps == 0`, behavior is controlled by `ops/apply_zero_step`.
+
+When forced mode is disabled, GUI apply falls back to tag-driven gain selection (`track_gain_db` / `album_gain_db`) as before.
 
 ## Logging
 

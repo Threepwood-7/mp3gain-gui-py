@@ -142,6 +142,29 @@ class OpsSettingsDomain(SettingsRegistry):
     def reckless_mode(self, value: bool) -> None:
         self._storage.set_value(self.RECKLESS_MODE_KEY, bool(value))
 
+    @property
+    def force_apply_normalization(self) -> bool:
+        return _norm.normalize_bool(
+            self._storage.value(
+                self.FORCE_APPLY_NORMALIZATION_KEY,
+                self.DEFAULT_FORCE_APPLY_NORMALIZATION,
+            )
+        )
+
+    @force_apply_normalization.setter
+    def force_apply_normalization(self, value: bool) -> None:
+        self._storage.set_value(self.FORCE_APPLY_NORMALIZATION_KEY, bool(value))
+
+    @property
+    def apply_zero_step(self) -> bool:
+        return _norm.normalize_bool(
+            self._storage.value(self.APPLY_ZERO_STEP_KEY, self.DEFAULT_APPLY_ZERO_STEP)
+        )
+
+    @apply_zero_step.setter
+    def apply_zero_step(self, value: bool) -> None:
+        self._storage.set_value(self.APPLY_ZERO_STEP_KEY, bool(value))
+
 
 class SessionSettingsDomain(SettingsRegistry):
     def __init__(self, storage: SettingsStorage) -> None:

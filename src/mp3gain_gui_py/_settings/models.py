@@ -26,6 +26,8 @@ class OpsSettings:
 
     wrap_gain: bool = False
     reckless_mode: bool = False
+    force_apply_normalization: bool = True
+    apply_zero_step: bool = False
 
 
 @dataclass(frozen=True, slots=True)

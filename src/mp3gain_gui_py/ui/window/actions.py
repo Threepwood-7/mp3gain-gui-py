@@ -226,10 +226,13 @@ class WindowActionsCoordinator:
         req = WorkerRequest(
             kind="apply_track",
             paths=paths,
+            target_db=self._settings.target_volume_db,
             tag_mode=self._settings.tag_mode,
             stored_tag_policy=self._settings.stored_tag_policy,
             wrap_gain=self._settings.wrap_gain,
             preserve_dates=self._settings.preserve_dates,
+            force_apply_normalization=self._settings.force_apply_normalization,
+            apply_zero_step=self._settings.apply_zero_step,
         )
         self._start_worker(req)
 
@@ -242,10 +245,13 @@ class WindowActionsCoordinator:
             kind="apply_album",
             paths=paths,
             album_groups=self._window.model.album_groups(),
+            target_db=self._settings.target_volume_db,
             tag_mode=self._settings.tag_mode,
             stored_tag_policy=self._settings.stored_tag_policy,
             wrap_gain=self._settings.wrap_gain,
             preserve_dates=self._settings.preserve_dates,
+            force_apply_normalization=self._settings.force_apply_normalization,
+            apply_zero_step=self._settings.apply_zero_step,
         )
         self._start_worker(req)
 

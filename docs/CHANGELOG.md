@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-03-10
+- Added forced normalize-on-apply runtime controls for GUI gain operations: new INI/UI settings `ops/force_apply_normalization` (default `true`) and `ops/apply_zero_step` (default `false`), with `Apply Track Gain`/`Apply Album Gain` now able to run fresh C-backend analysis before apply using legacy step-offset math (`target_db - 89.0`) instead of tag-only gain lookup.
 - Added a `Why?` section to `README.md` describing the project motivation as preservation/fun porting of classic software into modern runtime environments.
 - Updated GUI table behavior so all file-list columns are user-resizable (`QHeaderView.Interactive`) with persisted column widths still honored.
 - Switched background file workers (`AnalyzeWorker`, `GainWorker`, `TagWorker`) to `ProcessPoolExecutor`-based per-file execution up to logical CPU count, using top-level process-safe task functions and preserving progress/result signaling for each file.

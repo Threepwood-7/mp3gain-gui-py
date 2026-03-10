@@ -46,6 +46,8 @@ class WorkerRequest:
     # Gain writer options
     wrap_gain: bool = False
     preserve_dates: bool = False
+    force_apply_normalization: bool = True
+    apply_zero_step: bool = False
 
 
 @dataclass
