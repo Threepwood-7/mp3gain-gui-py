@@ -8,6 +8,7 @@ PySide6 port of MP3Gain GUI - ReplayGain analysis and gain adjustment
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Normalize 89 dB Helper](#normalize-89-db-helper)
 - [What Is ReplayGain?](#what-is-replaygain)
 - [Legacy CLI](#legacy-cli)
 - [Parity Harness](#parity-harness)
@@ -64,6 +65,34 @@ python -m mp3gain_gui_py
 
 ```bat
 python -m mp3gain_gui_py.legacy_cli /q /o /s r "song.mp3"
+```
+
+### Normalize 89 dB Helper
+
+Normalize every MP3 in a directory with legacy track-apply switches (`/r /c /s r`) using the Python CLI backend.
+
+In place (default):
+
+```bat
+python scripts\normalize_89db.py "C:\music\album"
+```
+
+Recurse through subdirectories:
+
+```bat
+python scripts\normalize_89db.py "C:\music" --recurse
+```
+
+Copy to destination then normalize there (source files unchanged):
+
+```bat
+python scripts\normalize_89db.py "C:\music" --dst-dir "C:\tmp\music-89db"
+```
+
+Recurse + preserve source-relative folder structure under destination:
+
+```bat
+python scripts\normalize_89db.py "C:\music" --recurse --dst-dir "C:\tmp\music-89db"
 ```
 
 ## What Is ReplayGain?
@@ -130,7 +159,7 @@ Behavior notes:
 - `/r` and `/a`: if both are present, the last one wins.
 - `/g` and `/l` are direct apply modes (bypass normal analysis/recommend flow).
 - Legacy MP3 global gain math is step-based, so exact dB targets can round to nearest step.
-- Runtime parity mode: when available, this CLI delegates execution to local `mp3gain.exe` (`c:\bin\mp3gain-win-1_2_5\mp3gain.exe`) to preserve output/byte behavior in parity runs.
+- `legacy_cli` runtime execution is pure Python. Local `mp3gain.exe` is used only by parity/benchmark scripts for external comparison.
 
 ### Tag Behavior and Player Compatibility
 

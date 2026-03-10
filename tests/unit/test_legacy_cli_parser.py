@@ -31,8 +31,6 @@ def test_r_a_precedence_last_wins() -> None:
         (["/s", "s", "sample.mp3"], "skip", False, "apev2"),
         (["/s", "r", "sample.mp3"], "recalc", False, "apev2"),
         (["/s", "d", "sample.mp3"], "auto", True, "apev2"),
-        (["/s", "i", "/s", "d", "sample.mp3"], "auto", True, "id3"),
-        (["/s", "a", "/s", "d", "sample.mp3"], "auto", True, "apev2"),
     ],
 )
 def test_parse_s_modes(
@@ -47,8 +45,20 @@ def test_parse_s_modes(
     assert args.tag_format == tag_format
 
 
+@pytest.mark.parametrize("mode", ["i", "a"])
+def test_parse_unsupported_s_modes_raise(mode: str) -> None:
+    with pytest.raises(ValueError, match="Unsupported /s mode"):
+        _parse_legacy_args(["/s", mode, "sample.mp3"])
+
+
 def test_parse_l_separated_values() -> None:
     args = _parse_legacy_args(["/l", "1", "-3", "sample.mp3"])
     assert args.single_channel is not None
     assert args.single_channel.channel_index == 1
     assert args.single_channel.steps == -3
+
+
+def test_parse_qmark_sets_help_qmark_mode() -> None:
+    args = _parse_legacy_args(["/?", "wrap"])
+    assert args.info_mode == "help_qmark"
+    assert args.info_topic == "wrap"

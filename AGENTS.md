@@ -17,6 +17,14 @@ with a single Python package.  Target feature parity: VB6 GUI v1.2.5.
 
 ---
 
+## Legacy CLI runtime policy
+
+- `src/mp3gain_gui_py/legacy_cli.py` must execute via the Python implementation only.
+- Do not add fallback/delegation from `legacy_cli` runtime flow to external `mp3gain.exe`.
+- `C:/bin/mp3gain-win-1_2_5/mp3gain.exe` is oracle-only for parity/validation tooling (for example `scripts/parity_*`), not a runtime backend.
+
+---
+
 ## Source references
 
 | What | Path |

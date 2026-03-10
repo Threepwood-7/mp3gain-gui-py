@@ -5,6 +5,14 @@ Legacy Pointers:
 """
 
 from __future__ import annotations
+from decimal import Decimal, ROUND_HALF_UP
+
+
+_SIX_DP = Decimal("0.000001")
+
+
+def _round_six_half_up(value: float) -> Decimal:
+    return Decimal(str(value)).quantize(_SIX_DP, rounding=ROUND_HALF_UP)
 
 # ── Tag key constants ──────────────────────────────────────────────────────────
 TAG_TRACK_GAIN = "REPLAYGAIN_TRACK_GAIN"
@@ -33,7 +41,10 @@ def format_gain(db: float) -> str:
 
     Legacy pointer: LEGACY_PTR:TAGS_FORMAT_CONTRACT.
     """
-    return f"{db:+9.6f} dB"
+    gain = f"{_round_six_half_up(db):+f}"
+    if len(gain) > 9:
+        gain = gain[:9]
+    return f"{gain} dB"
 
 
 def format_peak(peak: float) -> str:
@@ -41,7 +52,7 @@ def format_peak(peak: float) -> str:
 
     Legacy pointer: LEGACY_PTR:TAGS_FORMAT_CONTRACT.
     """
-    return f"{peak:<8.6f}"
+    return f"{_round_six_half_up(peak):f}"
 
 
 def format_undo(left: int, right: int, mode: str) -> str:
