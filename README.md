@@ -5,6 +5,7 @@ PySide6 port of MP3Gain GUI - ReplayGain analysis and gain adjustment
 ## Table of Contents
 
 - [Features](#features)
+- [Screenshot](#screenshot)
 - [Why?](#why)
 - [Requirements](#requirements)
 - [Installation](#installation)
@@ -29,6 +30,10 @@ PySide6 port of MP3Gain GUI - ReplayGain analysis and gain adjustment
 ## Features
 
 <!-- TODO: List key capabilities as bullet points. -->
+
+## Screenshot
+
+![mp3gain-gui-py main window](docs/screenshot.jpg)
 
 ## Why?
 
