@@ -8,7 +8,7 @@ PySide6 port of MP3Gain GUI - ReplayGain analysis and gain adjustment
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Normalize 89 dB Helper](#normalize-89-db-helper)
+- [Normalize Helper](#normalize-helper)
 - [What Is ReplayGain?](#what-is-replaygain)
 - [Legacy CLI](#legacy-cli)
 - [Legacy C Source Comparison (1.5.2 vs 1.6.2)](#legacy-c-source-comparison-152-vs-162)
@@ -81,32 +81,106 @@ python scripts\build_legacy_c_backend.py
 `legacy_cli` and runtime processing call the vendored C backend DLL (via `ctypes`) as the canonical execution path.
 The pure-Python runtime code is retained only as reference and is not maintained or tested.
 
-### Normalize 89 dB Helper
+### Normalize Helper
 
-Normalize every MP3 in a directory with legacy track-apply switches (`/r /c /s r`) using the C-backed legacy CLI runtime.
+Normalize every MP3 in a directory using the legacy two-step flow, per file:
+
+1. Analyze with `/q /o /s r`
+2. Apply with `/q /g <steps> /t` when the computed final steps are non-zero
+
+Final steps are computed with legacy step math:
+
+`final_steps = analyzed_steps + db_to_legacy_steps(target_db - 89.0)`
+
+Target dB is configurable via `--db` (default `89`), and parallelism is configurable via `--jobs` (default: CPU count).
+
+#### `run_normalize.py` Arguments (What They Actually Do)
+
+| Argument | What it controls | Practical effect |
+|---|---|---|
+| `src_dir` | Source MP3 discovery root | The script scans this directory for `.mp3` files and normalizes those files (or copies of them if `--dst-dir` is used). |
+| `--db <float>` | Target loudness relative to 89 dB baseline | Converted to integer step offset with legacy math: `db_to_legacy_steps(db - 89.0)`. This offset is added to analyzed `MP3 gain` before apply. |
+| `--recurse` | Discovery depth | If set, includes MP3 files in all subdirectories; otherwise only top-level files in `src_dir`. |
+| `--dst-dir <path>` | Output location mode | If set, source files are copied (preserving relative layout) and normalization is applied to copies only. If omitted, files are normalized in place. |
+| `--jobs <int>` | Parallel worker count | Number of concurrent file workers. Each worker still runs analyze then apply sequentially per file. Default is logical CPU count. |
+
+#### Under-the-Hood `legacy_cli` Commands
+
+For each file, `run_normalize.py` executes:
+
+1. Analysis command
+
+```bat
+python -m mp3gain_gui_py.legacy_cli /q /o /s r "<file>"
+```
+
+2. Apply command (only if final steps is non-zero)
+
+```bat
+python -m mp3gain_gui_py.legacy_cli /q /g <final_steps> /t "<file>"
+```
+
+Switch semantics used by the helper:
+
+| Switch | Meaning in this helper flow |
+|---|---|
+| `/q` | Quiet mode: suppresses non-essential chatter while preserving machine-parseable output. |
+| `/o` | Tabular output mode used by the helper parser to extract `MP3 gain` integer steps from the file row. |
+| `/s r` | Force recalculation from audio data and ignore existing gain tags during analysis. |
+| `/g <steps>` | Directly apply an explicit integer MP3 gain step value (no recompute in apply phase). |
+| `/t` | Apply using legacy temp-file write mode. |
+
+#### Step Computation Details
+
+`final_steps` is computed as:
+
+```text
+final_steps = analyzed_steps + db_to_legacy_steps(target_db - 89.0)
+```
+
+Examples:
+
+| `--db` | Offset term `db_to_legacy_steps(db - 89.0)` | Meaning |
+|---:|---:|---|
+| `89` | `0` | Use analyzed steps as-is. |
+| `87` | `-1` | Apply one step less than analyzed recommendation. |
+| `81` | `-5` | Apply five steps less than analyzed recommendation. |
+| `90.5` | `+1` | Apply one step more than analyzed recommendation. |
 
 In place (default):
 
 ```bat
-python scripts\normalize_89db.py "C:\music\album"
+python scripts\run_normalize.py "C:\music\album"
 ```
 
 Recurse through subdirectories:
 
 ```bat
-python scripts\normalize_89db.py "C:\music" --recurse
+python scripts\run_normalize.py "C:\music" --recurse
 ```
 
 Copy to destination then normalize there (source files unchanged):
 
 ```bat
-python scripts\normalize_89db.py "C:\music" --dst-dir "C:\tmp\music-89db"
+python scripts\run_normalize.py "C:\music" --dst-dir "C:\tmp\music-89db"
 ```
 
 Recurse + preserve source-relative folder structure under destination:
 
 ```bat
-python scripts\normalize_89db.py "C:\music" --recurse --dst-dir "C:\tmp\music-89db"
+python scripts\run_normalize.py "C:\music" --recurse --dst-dir "C:\tmp\music-89db"
+```
+
+Normalize to a different target dB:
+
+```bat
+python scripts\run_normalize.py "C:\music" --db 87
+```
+
+Set explicit parallelism:
+
+```bat
+python scripts\run_normalize.py "C:\music" --jobs 4
 ```
 
 ## What Is ReplayGain?
