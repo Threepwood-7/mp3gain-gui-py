@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-03-10
+- Imported VB6 GUI legacy upstream source snapshots `c:/prj/misc/mp3gain/mp3gain-win-gui-1_2_5-src` and `c:/prj/misc/mp3gain/mp3gain-win-gui-1_3_4-src` into `src/vbs/legacy/`, normalized to UTF-8 (no BOM) and LF-only line endings.
 - Versioned the generated C backend DLL artifact name using the vendored source tree version suffix (for current runtime source `mp3gain-1_5_2-src`, output is now `mp3gain_legacy_backend-1_5_2.dll`).
 - Imported legacy upstream source snapshot `c:/prj/misc/mp3gain/mp3gain-1_6_2-src` into `src/c/legacy/mp3gain-1_6_2-src`, normalized to UTF-8 (no BOM) and LF-only line endings.
 - Relocated vendored legacy C sources from `src/c/legacy` to `src/c/legacy/mp3gain-1_5_2-src` and updated backend build/runtime documentation pointers to the nested source root.
