@@ -28,8 +28,8 @@ if TYPE_CHECKING:
 
     from openpyxl.worksheet.worksheet import Worksheet
 
-DEFAULT_EXTERNAL_ORIGINAL_DIR = Path("f:/M/H06T01/dldz/MORE_SHR/mp3-albums/!car-selected")
-DEFAULT_EXTERNAL_REFERENCE_DIR = Path("f:/M/H06T01/dldz/NOT_SHARED/!car-selected-normalized")
+DEFAULT_EXTERNAL_ORIGINAL_DIR = Path("mp3-albums/original")
+DEFAULT_EXTERNAL_REFERENCE_DIR = Path("mp3-albums/reference-normalized")
 DEFAULT_REPORT_DIR = Path("c:/tmp/pycompa")
 DEFAULT_SAMPLE_SIZE = 30
 DEFAULT_SAMPLE_SEED = 42

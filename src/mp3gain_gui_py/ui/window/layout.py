@@ -36,7 +36,8 @@ class WindowLayoutCoordinator:
         self.file_view.setSortingEnabled(False)
         hdr = self.file_view.horizontalHeader()
         hdr.setStretchLastSection(False)
-        hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.file_view.setColumnWidth(0, 420)
         self.file_view.verticalHeader().setVisible(False)
 
         # ── Target volume spinbox ─────────────────────────────────────────────

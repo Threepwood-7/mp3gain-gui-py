@@ -1,33 +1,35 @@
-"""GainWorker — background gain application worker (no Qt)."""
+"""GainWorker - background gain application worker (no Qt)."""
 
 from __future__ import annotations
 
+import os
+from concurrent.futures import Future, ProcessPoolExecutor, as_completed
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .._legacy_exact.math import db_to_legacy_steps
-from .._legacy_exact.processor import (
-    LegacyCompatOptions,
-    LegacyExactProcessor,
-)
-from .._tags.reader import read_tags
+from .process_tasks import gain_file_task
 from .types import FileResult, WorkerRequest, WorkerResult
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from .worker_bridge import WorkerBridge
 
 
 class GainWorker:
-    """Apply gain changes to a list of MP3 files.
-
-    Supports: apply_track, apply_album, apply_constant, undo.
-    """
+    """Apply gain changes to a list of MP3 files."""
 
     def __init__(self, request: WorkerRequest, bridge: WorkerBridge) -> None:
         self._request = request
         self._bridge = bridge
-        self._processor = LegacyExactProcessor()
+
+    @staticmethod
+    def _max_workers(total: int) -> int:
+        return min(max(1, os.cpu_count() or 1), max(1, total))
+
+    @staticmethod
+    def _cancel_pending_futures(futures: dict[Future[FileResult], Path]) -> None:
+        for future in futures:
+            if not future.done():
+                future.cancel()
 
     def run(self) -> None:
         req = self._request
@@ -36,20 +38,43 @@ class GainWorker:
         succeeded = 0
         failed = 0
         cancelled = False
+        processed = 0
 
-        for i, path in enumerate(paths):
-            if self._bridge.is_cancelled:
-                cancelled = True
-                break
+        futures: dict[Future[FileResult], Path] = {}
+        with ProcessPoolExecutor(max_workers=self._max_workers(total)) as executor:
+            for path in paths:
+                if self._bridge.is_cancelled:
+                    cancelled = True
+                    break
+                self._bridge._relay_file_started(path)
+                future = executor.submit(
+                    gain_file_task,
+                    req.kind,
+                    str(path),
+                    constant_db=req.constant_db,
+                    wrap_gain=req.wrap_gain,
+                    preserve_dates=req.preserve_dates,
+                )
+                futures[future] = path
 
-            self._bridge._relay_file_started(path)
-            result = self._process_file(path)
-            if result.ok:
-                succeeded += 1
-            else:
-                failed += 1
-            self._bridge._relay_file_done(result)
-            self._bridge._relay_progress(i + 1, total)
+            for future in as_completed(futures):
+                if self._bridge.is_cancelled and not cancelled:
+                    cancelled = True
+                    self._cancel_pending_futures(futures)
+                path = futures[future]
+                if future.cancelled():
+                    continue
+                try:
+                    result = future.result()
+                except Exception as exc:  # pragma: no cover - defensive
+                    result = FileResult(path=path, ok=False, error_msg=str(exc))
+                if result.ok:
+                    succeeded += 1
+                else:
+                    failed += 1
+                processed += 1
+                self._bridge._relay_file_done(result)
+                self._bridge._relay_progress(processed, total)
 
         self._bridge._relay_all_done(
             WorkerResult(
@@ -60,45 +85,3 @@ class GainWorker:
                 cancelled=cancelled,
             )
         )
-
-    def _process_file(self, path: Path) -> FileResult:
-        req = self._request
-        options = LegacyCompatOptions(
-            wrap_gain=req.wrap_gain,
-            preserve_timestamp=req.preserve_dates,
-            use_temp_file=True,
-        )
-        try:
-            if req.kind == "undo":
-                result = self._processor.undo(path, options=options)
-                if result.exit_code != 0:
-                    return FileResult(path=path, ok=False, error_msg=result.message)
-            else:
-                gain_db = self._gain_for(path)
-                steps = db_to_legacy_steps(gain_db)
-                result = self._processor.apply_steps(
-                    path,
-                    left_steps=steps,
-                    options=options,
-                )
-                if result.exit_code != 0:
-                    return FileResult(path=path, ok=False, error_msg=result.message)
-        except Exception as exc:
-            return FileResult(path=path, ok=False, error_msg=str(exc))
-        return FileResult(path=path, ok=True)
-
-    def _gain_for(self, path: Path) -> float:
-        req = self._request
-        if req.kind == "apply_constant":
-            return req.constant_db
-        if req.kind == "apply_track":
-            tag_data = read_tags(path)
-            return tag_data.track_gain_db if tag_data.track_gain_db is not None else 0.0
-        if req.kind == "apply_album":
-            tag_data = read_tags(path)
-            if tag_data.album_gain_db is not None:
-                return tag_data.album_gain_db
-            if tag_data.track_gain_db is not None:
-                return tag_data.track_gain_db
-            return 0.0
-        return 0.0

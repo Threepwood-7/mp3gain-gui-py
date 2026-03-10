@@ -5,6 +5,7 @@ PySide6 port of MP3Gain GUI - ReplayGain analysis and gain adjustment
 ## Table of Contents
 
 - [Features](#features)
+- [Why?](#why)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Usage](#usage)
@@ -27,6 +28,12 @@ PySide6 port of MP3Gain GUI - ReplayGain analysis and gain adjustment
 ## Features
 
 <!-- TODO: List key capabilities as bullet points. -->
+
+## Why?
+
+Not because the old code could not be replaced, nor because the new machines demanded this exact labor, but because some tools are bound to the hours in which we first learned to trust them, and in this loud and hurried age there is a quiet pleasure in taking what was built then, with its plain windows and stubborn switches, and carrying it forward so it may keep doing its work in the present tense.
+
+So this port is as much affection as engineering: a way to keep a useful thing alive, to keep faith with the craft that made it, and to let software from the good old days stand up again in a new and crazier world without asking it to forget where it came from.
 
 ## Requirements
 
@@ -460,7 +467,7 @@ This dataset supersedes the earlier python-only baseline run and reflects DLL-ba
 | Field | Value |
 |---|---|
 | Date | `2026-03-10` |
-| Source pool | `f:\M\H06T01\dldz\MORE_SHR\mp3-albums\!car-selected` |
+| Source pool | `mp3-albums` |
 | Random sample size | `6` files |
 | Total sampled bytes | `46,178,377` (`~46.18 MB`) |
 | Command log | `c:\tmp\mp3\89dbcodex\exec.log` |

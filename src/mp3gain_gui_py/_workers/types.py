@@ -36,6 +36,9 @@ class WorkerRequest:
     # Target volume for analysis (dB, default 89)
     target_db: float = 89.0
 
+    # Analyze max-amplitude only (skip gain computation details).
+    max_amp_only: bool = False
+
     # Tag write mode
     tag_mode: str = "apev2"
     stored_tag_policy: StoredTagPolicy = "auto"

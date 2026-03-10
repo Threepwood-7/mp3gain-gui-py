@@ -1,6 +1,12 @@
 # Changelog
 
 ## 2026-03-10
+- Added a `Why?` section to `README.md` describing the project motivation as preservation/fun porting of classic software into modern runtime environments.
+- Updated GUI table behavior so all file-list columns are user-resizable (`QHeaderView.Interactive`) with persisted column widths still honored.
+- Switched background file workers (`AnalyzeWorker`, `GainWorker`, `TagWorker`) to `ProcessPoolExecutor`-based per-file execution up to logical CPU count, using top-level process-safe task functions and preserving progress/result signaling for each file.
+- Updated delete-tags worker execution to honor UI `tag_mode` (`apev2`/`id3`) when dispatching process-pool delete tasks.
+- Fixed GUI track-analysis worker contract regression: `WorkerRequest` now defines `max_amp_only` (default `False`) so `AnalyzeWorker` no longer fails with missing-attribute errors on folder analysis runs.
+- Anonymized external music-source path references to `mp3-albums` in documentation and parity helper defaults (`README.md`, `scripts/parity_external_sample_report.py`).
 - Re-enabled legacy CLI `/s i` and `/s a` scan modes: `/s i` now selects ID3 tag backend and `/s a` selects APEv2 tag backend for tag read/write/delete operations, with updated parser/branch tests and README switch documentation.
 - Expanded `README.md` Legacy CLI `Switch Reference` into a full per-switch behavior guide with code-accurate semantics, interaction notes, caveats, and usage examples.
 - Expanded README normalize-helper documentation with explicit argument semantics (`src_dir`, `--db`, `--recurse`, `--dst-dir`, `--jobs`) and detailed underlying `legacy_cli` command/switch behavior.
