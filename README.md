@@ -11,6 +11,9 @@ PySide6 port of MP3Gain GUI - ReplayGain analysis and gain adjustment
 - [Normalize 89 dB Helper](#normalize-89-db-helper)
 - [What Is ReplayGain?](#what-is-replaygain)
 - [Legacy CLI](#legacy-cli)
+- [Legacy C Source Comparison (1.5.2 vs 1.6.2)](#legacy-c-source-comparison-152-vs-162)
+- [Legacy VB6 Source Comparison (1.2.5 vs 1.3.4)](#legacy-vb6-source-comparison-125-vs-134)
+- [C-Backend Performance Report (Migrated From PERF.md)](#c-backend-performance-report-migrated-from-perfmd)
 - [Parity Harness](#parity-harness)
 - [rgain3 Notes](#rgain3-notes)
 - [Configuration](#configuration)
@@ -214,6 +217,247 @@ Modifier lanes:
 python -m mp3gain_gui_py.legacy_cli /q /r /c /s r /m 1 "song.mp3"
 python -m mp3gain_gui_py.legacy_cli /q /r /c /s r /d 1.5 "song.mp3"
 ```
+
+## Legacy C Source Comparison (1.5.2 vs 1.6.2)
+
+This section records the current in-repo comparison between:
+
+- `src/c/legacy/mp3gain-1_5_2-src`
+- `src/c/legacy/mp3gain-1_6_2-src`
+
+### Snapshot Inventory
+
+| Metric | `1_5_2` | `1_6_2` |
+|---|---:|---:|
+| Total files | 54 | 21 |
+| Common-path files | 21 | 21 |
+| Identical common files | 14 | 14 |
+| Changed common files | 7 | 7 |
+| Files only in tree | 33 | 0 |
+
+### Files Present Only In `1_5_2`
+
+`1_6_2` does not include these paths:
+
+```text
+c_api_shim.c
+c_api_shim.h
+mpglibDBL/CVS/Entries
+mpglibDBL/CVS/Repository
+mpglibDBL/CVS/Root
+mpglibDBL/README
+mpglibDBL/VbrTag.h
+mpglibDBL/bitstream.h
+mpglibDBL/common.c
+mpglibDBL/common.h
+mpglibDBL/config.h
+mpglibDBL/dct64_i386.c
+mpglibDBL/dct64_i386.h
+mpglibDBL/decode_i386.c
+mpglibDBL/decode_i386.h
+mpglibDBL/encoder.h
+mpglibDBL/huffman.h
+mpglibDBL/interface.c
+mpglibDBL/interface.h
+mpglibDBL/l2tables.h
+mpglibDBL/lame-analysis.h
+mpglibDBL/lame.h
+mpglibDBL/layer1.c
+mpglibDBL/layer1.h
+mpglibDBL/layer2.c
+mpglibDBL/layer2.h
+mpglibDBL/layer3.c
+mpglibDBL/layer3.h
+mpglibDBL/machine.h
+mpglibDBL/mpg123.h
+mpglibDBL/mpglib.h
+mpglibDBL/tabinit.c
+mpglibDBL/tabinit.h
+```
+
+### Changed Common Files
+
+Approximate line churn (`+added/-removed`) across changed common files:
+
+| File | Churn | Note |
+|---|---:|---|
+| `mp3gain.c` | `+173/-310` | decode backend and runtime flow changes |
+| `id3tag.c` | `+116/-3` | ReplayGain `TXXX` decode/write support and safety updates |
+| `Makefile` | `+34/-18` | links `-lmpg123`, removes `mpglibDBL` object list |
+| `apetag.c` | `+18/-4` | stronger tag bounds/offset validation |
+| `lgpl.txt` | `+9/-13` | license text revision |
+| `mp3gain.h` | `+2/-12` | version bump and reduced DLL prototype surface |
+| `gain_analysis.c` | `+6/-6` | mostly macro naming/unit-expression cleanup |
+
+`git diff --no-index --stat` on the two trees reports 40 changed paths with net large removals due to `mpglibDBL` absence in `1_6_2`.
+
+### Key Behavioral/Build Differences
+
+| Area | `1_5_2` | `1_6_2` |
+|---|---|---|
+| Decoder backend | bundled `mpglibDBL` decode path | external `libmpg123` decode path |
+| Temp-write mode | historical temp-file switch behavior | temp-file mode is default; `-T` switches to direct modify |
+| ReplayGain ID3 handling | RVA2 and mp3gain-private frame focus | adds case-insensitive `TXXX` ReplayGain parse/write (`replaygain_track_*`, `replaygain_album_*`, `replaygain_reference_loudness`) |
+| APE/tag safety checks | fewer offset/length guards | extra validation for malformed offsets/lengths |
+| `asWIN32DLL` header surface | includes `scanFile`, `beginAlbumScan`, `finishAlbumScan`, `changeGain` | only declares `changeGain` |
+| Makefile linkage model | compiles local decoder objects (`mpglibDBL/*.c`) | links `-lmpg123`; no local `mpglibDBL` object list |
+| Project shim presence | includes project `c_api_shim.c/.h` in vendored tree | imported upstream tree has no project shim files |
+
+### Impact On This Repository
+
+1. Current Python runtime and ctypes backend are wired to `src/c/legacy/mp3gain-1_5_2-src` plus project shim exports.
+2. Switching runtime to `1_6_2` is not drop-in and requires shim port/adaptation to the `1_6_2` codebase.
+3. Build pipeline would need `libmpg123` dependency handling and updated compile/link inputs.
+4. CLI parity and byte-level output parity must be revalidated due to decode and tag behavior changes.
+5. Canonical runtime remains `1_5_2`-based unless an explicit migration is completed.
+
+## Legacy VB6 Source Comparison (1.2.5 vs 1.3.4)
+
+This section records the current in-repo comparison between:
+
+- `src/vbs/legacy/mp3gain-win-gui-1_2_5-src`
+- `src/vbs/legacy/mp3gain-win-gui-1_3_4-src`
+
+### Snapshot Inventory
+
+| Metric | `1_2_5` | `1_3_4` |
+|---|---:|---:|
+| Total files | 39 | 41 |
+| Common-path files | 39 | 39 |
+| Identical common files | 33 | 33 |
+| Changed common files | 6 | 6 |
+| Files only in tree | 0 | 2 |
+
+`git diff --no-index --stat` across both trees reports 8 changed paths and overall churn of `452 insertions(+), 84 deletions(-)`.
+
+### Files Present Only In `1_3_4`
+
+```text
+basFixUnicodeFileName.bas
+basUnicodeFileFind.bas
+```
+
+### Changed File Churn (Top Files)
+
+Approximate line churn (`+added/-removed`) across changed common files:
+
+| File | Churn | Note |
+|---|---:|---|
+| `frmMain.frm` | `+197/-39` | Unicode-aware file handling, command paths, and lookup logic |
+| `basCommandOutput.bas` | `+58/-25` | process launch/pipe handling hardening and API declaration fixes |
+| `basCommDialog.bas` | `+39/-14` | ANSI/Unicode open-save dialog branching |
+| `Get Directory Dialog.bas` | `+14/-6` | Unicode-related directory dialog handling adjustments |
+| `MP3Gain.vbp` | `+4/-2` | version bump + added Unicode helper modules |
+| `Mp3Info.cls` | `+1/-0` | `mLongPathName` field for long-path restoration checks |
+
+### Key Behavioral Differences
+
+| Area | `1_2_5` | `1_3_4` |
+|---|---|---|
+| Unicode file discovery | no dedicated wide-char scanner module | adds `basUnicodeFileFind.bas` (`FindFirstFileW`/`FindNextFileW` path scanning) |
+| Unicode filename repair | none | adds `basFixUnicodeFileName.bas` (`GetLongPathNameW`, `MoveFileW`) |
+| Dialog API usage | `GetOpenFileNameA` / `GetSaveFileNameA` only | runtime branch to `GetOpenFileNameW` / `GetSaveFileNameW` when Unicode-capable OS detected |
+| Main form file-key strategy | list item operations mostly keyed by display text | list item key path handling branches to short-path keys with long-path reconciliation |
+| Command execution plumbing | older `STARTUPINFO`/pipe handling and less defensive handle setup | stricter structure declarations, startup init, duplicate-handle checks, output buffer resets |
+| Project metadata | `MP3Gain.vbp` version 1.2.5 | `MP3Gain.vbp` version 1.3.4 with Unicode modules added |
+
+### Semantics Relevant To Current Python Port
+
+1. The largest VB delta (`frmMain.frm`) is primarily about Windows Unicode path robustness and command invocation path normalization.
+2. `basUnicodeFileFind.bas` and `basFixUnicodeFileName.bas` encode behavior worth retaining as reference for non-ASCII/long-path edge cases in parity tooling.
+3. `1_3_4` appears to be a compatibility/stability iteration over `1_2_5`, not a total workflow redesign.
+4. VB6 legacy tree diffs are now documented in-repo to support traceability when deciding which GUI reference behavior should drive Python parity.
+
+## C-Backend Performance Report (Migrated From PERF.md)
+
+This section preserves the latest oracle-vs-Python performance/parity execution for `legacy_cli` after the C-DLL runtime migration.
+
+### Purpose
+
+This dataset supersedes the earlier python-only baseline run and reflects DLL-backed runtime behavior.
+
+### Latest Execution (C-backed Python CLI)
+
+| Field | Value |
+|---|---|
+| Date | `2026-03-10` |
+| Source pool | `f:\M\H06T01\dldz\MORE_SHR\mp3-albums\!car-selected` |
+| Random sample size | `6` files |
+| Total sampled bytes | `46,178,377` (`~46.18 MB`) |
+| Command log | `c:\tmp\mp3\89dbcodex\exec.log` |
+| Machine report | `c:\tmp\mp3\89dbcodex\parity_perf_report.json` |
+| Scenario outputs | `c:\tmp\mp3\89dbcodex\runs\` |
+
+### Selected Files
+
+Track titles are intentionally anonymized in documentation output.
+
+1. `sample_01.mp3`
+2. `sample_02.mp3`
+3. `sample_03.mp3`
+4. `sample_04.mp3`
+5. `sample_05.mp3`
+6. `sample_06.mp3`
+
+### Scenario Matrix
+
+| Scenario | Switches |
+|---|---|
+| `analysis_o_sr` | `/q /o /s r` |
+| `g_89` | `/q /r /c /s r /g 0` |
+| `g_87` | `/q /r /c /s r /g 0 /d -2` |
+| `g_81` | `/q /r /c /s r /g 0 /d -8` |
+| `m_plus_1` | `/q /r /c /s r /m 1` |
+| `d_plus_1_5` | `/q /r /c /s r /d 1.5` |
+
+### Parity Results
+
+All scenarios passed:
+
+1. `output_parity = True`
+2. `byte_parity_all_files = True`
+3. `oracle_returncode = 0`
+4. `python_returncode = 0`
+
+No byte mismatches were reported for any file in any scenario.
+
+### Detailed Timing (Oracle vs Python DLL)
+
+`ratio = python_elapsed / oracle_elapsed`
+
+| Scenario | Oracle | Python DLL | Ratio | Delta |
+|---|---:|---:|---:|---:|
+| `analysis_o_sr` | `7.428429s` | `9.650772s` | `1.299x` | `+2.222343s` |
+| `g_89` | `0.030019s` | `0.120492s` | `4.014x` | `+0.090473s` |
+| `g_87` | `0.029601s` | `0.118373s` | `3.999x` | `+0.088772s` |
+| `g_81` | `0.028959s` | `0.127494s` | `4.403x` | `+0.098535s` |
+| `m_plus_1` | `7.888899s` | `5.210642s` | `0.661x` | `-2.678256s` |
+| `d_plus_1_5` | `7.797092s` | `5.274918s` | `0.677x` | `-2.522175s` |
+
+### Aggregate Timing
+
+| Metric | Value |
+|---|---:|
+| Oracle total | `23.202999s` |
+| Python DLL total | `20.502690s` |
+| Aggregate ratio (`python/oracle`) | `0.8836x` |
+
+Interpretation:
+
+1. Python DLL path is slower for very short direct-gain lanes (`/g` family), where process/CLI overhead dominates.
+2. Python DLL path is faster for longer apply lanes (`/m`, `/d`) in this sample.
+3. Combined run time is better on Python DLL by about `11.64%`.
+
+### Exact Commands
+
+All commands executed in this run are stored verbatim in:
+
+- `c:\tmp\mp3\89dbcodex\exec.log`
+
+This includes:
+
+1. Oracle commands (`C:\bin\mp3gain-win-1_2_5\mp3gain.exe ...`) for each scenario.
+2. Python commands (`python -m mp3gain_gui_py.legacy_cli ...`) for each scenario.
 
 ## Parity Harness
 
