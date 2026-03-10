@@ -29,7 +29,12 @@ PySide6 port of MP3Gain GUI - ReplayGain analysis and gain adjustment
 
 ## Features
 
-<!-- TODO: List key capabilities as bullet points. -->
+- DLL-backed runtime using vendored legacy MP3Gain C sources (`ctypes`), with the C backend as the canonical execution engine.
+- Fast parallel GUI processing via process pools, scaling worker count to logical CPU cores for high-throughput analysis/apply runs.
+- Full day-to-day gain workflow in the GUI: track analysis, album analysis, apply track gain, apply album gain, apply constant gain, undo, and tag deletion.
+- Forced analyze+normalize-on-apply controls in the GUI (enabled by default), including configurable handling for zero-step outcomes.
+- Legacy-compatible CLI surface (`python -m mp3gain_gui_py.legacy_cli`) backed by the same C runtime path as the GUI.
+- Batch normalization helper (`scripts/run_normalize.py`) with configurable target dB and parallel jobs for large directory processing.
 
 ## Screenshot
 
