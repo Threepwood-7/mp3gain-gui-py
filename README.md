@@ -215,38 +215,41 @@ Switches accept either `/` or `-` prefixes. Attached and separated values are su
 
 ### Switch Reference
 
-| Switch | Meaning |
-|---|---|
-| `/v` | Show version-style info. |
-| `/h`, `/?` | Show help text. `/? wrap` asks for wrap-topic help. |
-| `/q` | Quiet mode (minimal status output). |
-| `/o` | Tabular output (database-friendly fields). |
-| `/s c` | Check stored gain/tag info only (no recalc). |
-| `/s d` | Delete MP3Gain stored tag info. |
-| `/s s` | Skip stored tag info (ignore read/write tags). |
-| `/s r` | Force recalculation (do not read tag info). |
-| `/s i` | Use ID3v2 backend for MP3Gain tag fields. |
-| `/s a` | Use APEv2 backend for MP3Gain tag fields (legacy default). |
-| `/r` | Apply Track gain automatically. |
-| `/a` | Apply Album gain automatically. |
-| `/e` | Skip album analysis even with multiple files (track-only behavior). |
-| `/g <i>` | Apply explicit integer MP3 gain steps directly (no analysis). |
-| `/l <ch> <i>` | Apply explicit integer steps to one channel only (stereo-only path). |
-| `/m <i>` | Add integer step modifier to suggested gain. |
-| `/d <n>` | Add floating-point dB modifier to suggested gain. |
-| `/k` | Auto-lower gain to avoid clipping. |
-| `/c` | Continue/apply despite clipping warning. |
-| `/w` | Wrap gain arithmetic at boundaries (legacy wrap behavior). |
-| `/p` | Preserve original file timestamps when mutating files. |
-| `/t` | Use alternate write mode (legacy temp-file behavior switch). |
-| `/x` | Max-amplitude-focused mode (analysis emphasis). |
-| `/f` | Force mode for legacy compatibility paths. |
-| `/u` | Undo prior MP3Gain change using stored undo metadata. |
+| Switch | Exact behavior in this repo | Interactions / caveats | Example |
+|---|---|---|---|
+| `/v` | Prints version-style banner text. | If no files are passed, command exits successfully after printing info. | `/v` |
+| `/h` | Prints help usage/switch list. | Optional help topic may be attached (`/hwrap`) but is informational only. | `/h` |
+| `/?` | Help mode matching legacy style. | With no files and no topic (`/?`), exit code is `1` (legacy parity). With topic (`/? wrap`), exits `0`. | `/? wrap` |
+| `/q` | Quiet mode. Suppresses normal recommendation/apply chatter. | Errors still go to stderr and still fail command when applicable. | `/q /o /s r file.mp3` |
+| `/o` | Tabular output mode (tab-separated). | Header shape depends on mode: regular analysis, check-only (`/s c`), or undo (`/u`). | `/o /s r file.mp3` |
+| `/s c` | Check-only mode: read stored MP3Gain data, do not analyze audio or apply gain. | Best for inspecting existing tags quickly; combines well with `/o`. | `/q /o /s c file.mp3` |
+| `/s d` | Delete MP3Gain tag data from files. | Tag deletion path; does not perform gain analysis/apply. | `/s d file.mp3` |
+| `/s s` | Skip tag update mode during runtime processing. | Treats processing as "do not rely on/write runtime tag state" for non-undo paths. Useful when you want computation without MP3Gain tag mutation. | `/q /o /s s file.mp3` |
+| `/s r` | Recalculate from audio data and clear/rebuild recalculated fields. | This is the forced analysis mode used by parity/perf harnesses and `run_normalize.py`. | `/q /o /s r file.mp3` |
+| `/s i` | Select ID3 tag backend for MP3Gain tag read/write/delete operations. | Does not change analyze/apply math; controls which tag family is used for MP3Gain metadata operations in this invocation. | `/s i /s d file.mp3` |
+| `/s a` | Select APEv2 tag backend for MP3Gain tag read/write/delete operations. | This is the default backend if neither `/s i` nor `/s a` is provided. | `/s a /s d file.mp3` |
+| `/r` | Auto-apply Track gain path (per file). | If both `/r` and `/a` are present, last one wins. Subject to clipping rules unless `/c` or `/k` is used. | `/r /c /s r file.mp3` |
+| `/a` | Auto-apply Album gain path (shared album step outcome). | If both `/r` and `/a` are present, last one wins. Album summary row appears in table mode where applicable. | `/a /c /s r file1.mp3 file2.mp3` |
+| `/e` | Accepted for compatibility, but treated as unrecognized option text. | Emits `"I don't recognize option /e"` and does not alter execution behavior. | `/e file.mp3` |
+| `/g <i>` | Directly apply explicit integer MP3 gain steps. | Bypasses recommend/analyze decision flow for apply. Often paired with `/t` in deterministic workflows. | `/q /g 3 /t file.mp3` |
+| `/l <ch> <i>` | Single-channel direct step apply (`ch=0` left, `ch=1` right). | Accepts separated form (`/l 0 2`) and attached form (`/l0,2`, `/l0:2`, `/l0;2`). | `/l 1 -2 file.mp3` |
+| `/m <i>` | Integer step modifier added to computed recommendation path. | Changes step math directly; can be combined with `/r` or `/a`. | `/r /m 1 /s r file.mp3` |
+| `/d <n>` | Floating-point dB modifier added before step quantization. | Converted to legacy steps via quantized math, so final result may round to nearest step. | `/r /d -2 /s r file.mp3` |
+| `/k` | Auto-clipping prevention. | If requested steps would clip, steps are reduced to the max non-clipping value. | `/r /k /s r file.mp3` |
+| `/c` | Clipping override/confirmation. | Allows apply even when clipping risk exists (without auto-lowering). | `/r /c /s r file.mp3` |
+| `/w` | Wrap gain arithmetic mode for legacy behavior. | Affects gain-byte boundary behavior and undo metadata mode (`W` vs `N`). | `/r /w /c /s r file.mp3` |
+| `/p` | Preserve original file timestamps when writing tags. | Applies on tag write/delete operations that mutate metadata. | `/r /p /c /s r file.mp3` |
+| `/t` | Enable legacy temp-file mutation mode during apply. | Frequently used in deterministic apply flows (`/g ... /t`). | `/q /g -1 /t file.mp3` |
+| `/x` | Max-amplitude-focused analysis mode. | Gain recommendation fields are de-emphasized; primarily useful for legacy parity lanes. | `/o /x /s r file.mp3` |
+| `/f` | Compatibility placeholder switch. | Parsed for compatibility; currently no distinct runtime behavior change in this port. | `/f /r /s r file.mp3` |
+| `/u` | Undo prior change using stored MP3Gain undo metadata. | In table mode prints left/right undo step columns; no effect if no undo info exists. | `/u file.mp3` |
 
 Behavior notes:
-- `/r` and `/a`: if both are present, the last one wins.
-- `/g` and `/l` are direct apply modes (bypass normal analysis/recommend flow).
-- Legacy MP3 global gain math is step-based, so exact dB targets can round to nearest step.
+- `/r` and `/a`: last one wins.
+- `/g` and `/l` are direct-apply paths and bypass regular recommendation flow.
+- `/m` and `/d` modify recommendation math; `/g` and `/l` override with explicit apply steps.
+- `/k` (auto-lower) and `/c` (allow clipping) are clipping-policy controls for apply paths.
+- Legacy MP3 global gain math is step-based, so exact dB targets quantize to nearest step.
 - `legacy_cli` runtime execution is DLL-backed from vendored C sources (`src/c/legacy/mp3gain-1_5_2-src` + `src/mp3gain_gui_py/_c_backend`).
 - Pure-Python runtime code is reference-only and is not maintained or tested.
 - There is no supported Python runtime fallback path; if DLL backend initialization fails, runtime commands fail.
@@ -254,15 +257,17 @@ Behavior notes:
 
 ### Tag Behavior and Player Compatibility
 
-MP3Gain stores analysis/undo state in MP3 tags. Historically this is often APEv2 (`/s a`) and can also be ID3-based (`/s i`).
+MP3Gain analysis/undo state is stored in MP3 tags by runtime operations that write metadata.
 
 Practical guidance:
-- Use `/s r` when you want forced recalculation and no tag reads.
-- Use `/s s` when you want to skip both reading and writing MP3Gain tags.
+- Use `/s r` when you want forced recalculation from audio data.
+- Use `/s s` when you want to avoid runtime MP3Gain tag mutation in normal processing paths.
 - Use `/s d` to remove MP3Gain analysis/undo tags already written.
+- Use `/s i` to target ID3-based MP3Gain metadata operations.
+- Use `/s a` to target APEv2-based MP3Gain metadata operations (default).
 
 Compatibility note (from MP3Gain FAQ experience):
-- Some players with non-standard tag handling can display garbage metadata after APEv2 tag writes. If that happens, prefer skip/delete-tag flows (`/s s`, `/s d`) or switch tag backend strategy.
+- Some players with non-standard tag handling can display garbage metadata after MP3Gain-style tag writes. If that happens, prefer skip/delete-tag flows (`/s s`, `/s d`).
 
 ### Common Command Recipes
 

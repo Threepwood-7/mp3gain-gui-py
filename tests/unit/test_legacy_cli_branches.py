@@ -151,6 +151,8 @@ def test_check_only_branch_uses_tag_metrics_and_skips_processor_analysis(
     ("argv", "expected_format"),
     [
         (["/q", "/s", "d"], "apev2"),
+        (["/q", "/s", "d", "/s", "i"], "id3"),
+        (["/q", "/s", "d", "/s", "a"], "apev2"),
     ],
 )
 def test_delete_tag_branch_calls_processor_with_expected_format(

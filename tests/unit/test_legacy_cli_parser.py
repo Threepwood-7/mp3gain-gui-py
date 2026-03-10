@@ -31,6 +31,9 @@ def test_r_a_precedence_last_wins() -> None:
         (["/s", "s", "sample.mp3"], "skip", False, "apev2"),
         (["/s", "r", "sample.mp3"], "recalc", False, "apev2"),
         (["/s", "d", "sample.mp3"], "auto", True, "apev2"),
+        (["/s", "i", "sample.mp3"], "auto", False, "id3"),
+        (["/s", "a", "sample.mp3"], "auto", False, "apev2"),
+        (["/s", "d", "/s", "i", "sample.mp3"], "auto", True, "id3"),
     ],
 )
 def test_parse_s_modes(
@@ -45,10 +48,9 @@ def test_parse_s_modes(
     assert args.tag_format == tag_format
 
 
-@pytest.mark.parametrize("mode", ["i", "a"])
-def test_parse_unsupported_s_modes_raise(mode: str) -> None:
+def test_parse_unsupported_s_mode_raises() -> None:
     with pytest.raises(ValueError, match="Unsupported /s mode"):
-        _parse_legacy_args(["/s", mode, "sample.mp3"])
+        _parse_legacy_args(["/s", "z", "sample.mp3"])
 
 
 def test_parse_l_separated_values() -> None:

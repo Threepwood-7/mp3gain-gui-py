@@ -101,9 +101,10 @@ def _parse_scan_code(
         return "recalc", False, tag_format
     if norm == "d":
         return current_policy, True, tag_format
-    # mp3gain.exe 1.4.6 (used as oracle) does not accept /s i or /s a.
-    if norm in {"i", "a"}:
-        raise ValueError(f"Unsupported /s mode for this legacy binary: {code!r}")
+    if norm == "i":
+        return current_policy, delete_tags_requested, "id3"
+    if norm == "a":
+        return current_policy, delete_tags_requested, "apev2"
     raise ValueError(f"Unsupported /s mode: {code!r}")
 
 

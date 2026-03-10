@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-03-10
+- Re-enabled legacy CLI `/s i` and `/s a` scan modes: `/s i` now selects ID3 tag backend and `/s a` selects APEv2 tag backend for tag read/write/delete operations, with updated parser/branch tests and README switch documentation.
+- Expanded `README.md` Legacy CLI `Switch Reference` into a full per-switch behavior guide with code-accurate semantics, interaction notes, caveats, and usage examples.
 - Expanded README normalize-helper documentation with explicit argument semantics (`src_dir`, `--db`, `--recurse`, `--dst-dir`, `--jobs`) and detailed underlying `legacy_cli` command/switch behavior.
 - Reworked `scripts/run_normalize.py` normalization flow to match legacy two-step command execution (`/q /o /s r` analyze, then `/q /g <steps> /t` apply when non-zero), with `--db` implemented via legacy step-offset math (`db_to_legacy_steps(target_db - 89.0)`).
 - Renamed `scripts/normalize_89db.py` to `scripts/run_normalize.py`; added configurable `--db` target loudness and `--jobs` parallelism (default: CPU count), while keeping default target at 89 dB.
@@ -45,7 +47,7 @@
 - Documented practical legacy CLI and parity-matrix usage in `README.md`, including common `/o /s r`, `/g`, `/m`, and `/d` command examples.
 - Expanded README documentation with a ReplayGain primer, full per-switch legacy CLI reference, concrete 89/87/81 workflow recipes, parity harness artifacts, and `rgain3` integration notes.
 - Incorporated guidance from the original MP3Gain FAQ into README: ReplayGain vs peak normalization, non-transcoding gain behavior, and MP3Gain tag compatibility caveats/workarounds.
-- Corrected `legacy_cli` runtime parity behaviors for legacy oracle alignment: `/?` now exits with code 1 when no files are provided, `/e` is reported as an unrecognized option (non-fatal), `/s i` and `/s a` are rejected for this binary target, and `/t` now enables temp-file mode instead of being on by default.
+- Corrected `legacy_cli` runtime parity behaviors for legacy oracle alignment during an intermediate migration stage: `/?` now exits with code 1 when no files are provided, `/e` is reported as an unrecognized option (non-fatal), `/s i` and `/s a` were temporarily rejected, and `/t` now enables temp-file mode instead of being on by default.
 - Reworked `legacy_cli` mutation flows to update MP3Gain tags after apply/undo/direct/single-channel operations using C-style `changeGainAndTag` semantics (undo accumulation, 1.505 dB step approximation, peak scaling, wrap/clamp rules), including tag writes during `/s r` recalculation paths.
 - Improved table parity paths by emitting 11-column check-only (`/s c /o`) rows with `NA` placeholders, and by restoring album summary/output handling for non-track table modes.
 - Switched MP3Gain tag float formatting to 6-decimal half-up rounding to better match legacy C `sprintf` behavior for gain/peak fields.
