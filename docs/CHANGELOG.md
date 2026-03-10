@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-03-10
+- Added `PERF.md` with detailed C-vs-Python parity/performance findings and exact reproducible test instructions, plus a reusable harness script at `scripts/perf/run_c_python_parity_perf.py`.
+- Sanitized `PERF.md` to remove personal MP3 source-path and filename references, replacing them with neutral placeholders.
 - Reduced legacy CLI runtime overhead by removing repeated `bytearray`->`bytes` copies in frame mutation loops and by collapsing duplicated decode passes via combined track/album metric analysis paths.
 - Enforced `legacy_cli` as a pure-Python runtime path by removing `mp3gain.exe` passthrough/delegation logic from `src/mp3gain_gui_py/legacy_cli.py`.
 - Added runtime unit coverage for `legacy_cli` Python execution paths (`/q /o /s r`, `/g`, `/m`, `/d`, `/u`) and regression checks that oracle passthrough symbols are absent.
