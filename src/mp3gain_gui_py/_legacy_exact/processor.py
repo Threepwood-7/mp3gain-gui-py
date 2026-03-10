@@ -59,22 +59,38 @@ class LegacyExactProcessor:
         return gain_db
 
     def analyze_track_gain_db_with_fallback(self, path: Path) -> tuple[float, bool]:
+        gain_db, _max_amp, used_ascii_alias = self.analyze_track_gain_and_peak_with_fallback(path)
+        return gain_db, used_ascii_alias
+
+    def analyze_track_gain_and_peak_with_fallback(self, path: Path) -> tuple[float, float, bool]:
         try:
-            return self._analyze_track_gain_db_impl(path), False
+            gain_db, max_amp = self._analyze_track_gain_and_peak_impl(path)
+            return gain_db, max_amp, False
         except Exception:
             if not self._contains_non_ascii(path):
                 raise
         with tempfile.TemporaryDirectory(prefix="mp3gain_ascii_") as temp_dir:
             alias_path = Path(temp_dir) / "input.mp3"
             shutil.copyfile(path, alias_path)
-            return self._analyze_track_gain_db_impl(alias_path), True
+            gain_db, max_amp = self._analyze_track_gain_and_peak_impl(alias_path)
+            return gain_db, max_amp, True
 
     def _analyze_track_gain_db_impl(self, path: Path) -> float:
+        gain_db, _max_amp = self._analyze_track_gain_and_peak_impl(path)
+        return gain_db
+
+    def _analyze_track_gain_and_peak_impl(self, path: Path) -> tuple[float, float]:
         sample_rate, _channels = read_mp3_info(path)
         analyzer = GainAnalyzer(sample_rate)
+        max_amp = 0.0
         for _sr, left, right in decode_to_stereo_chunks(path, chunk_frames=8192):
             analyzer.analyze_samples(left, right, len(left))
-        return analyzer.get_title_gain()
+            left_peak = max((abs(value) for value in left), default=0.0)
+            right_peak = max((abs(value) for value in right), default=0.0)
+            chunk_peak = left_peak if left_peak >= right_peak else right_peak
+            if chunk_peak > max_amp:
+                max_amp = chunk_peak
+        return analyzer.get_title_gain(), max_amp
 
     @staticmethod
     def _contains_non_ascii(path: Path) -> bool:
@@ -86,6 +102,20 @@ class LegacyExactProcessor:
 
     def analyze_minmax_gain(self, path: Path) -> tuple[int, int]:
         return scan_file(path)
+
+    def analyze_track_metrics(
+        self,
+        path: Path,
+        *,
+        include_gain: bool = True,
+    ) -> tuple[float, float, int, int]:
+        if include_gain:
+            gain_db, max_amp, _used_ascii_alias = self.analyze_track_gain_and_peak_with_fallback(path)
+        else:
+            gain_db = 0.0
+            max_amp = self.analyze_max_amplitude(path)
+        min_gain, max_gain = self.analyze_minmax_gain(path)
+        return gain_db, max_amp, min_gain, max_gain
 
     def analyze_album_gain_db(self, paths: list[Path]) -> float:
         if not paths:
@@ -103,6 +133,38 @@ class LegacyExactProcessor:
             mins.append(min_gain)
             maxes.append(max_gain)
         return min(mins), max(maxes)
+
+    def analyze_album_metrics(
+        self,
+        paths: list[Path],
+        *,
+        include_gain: bool = True,
+    ) -> tuple[float, int, int, float]:
+        if not paths:
+            return 0.0, 0, 0, 0.0
+
+        gain_sum = 0.0
+        min_gain = 255
+        max_gain = 0
+        max_amp = 0.0
+
+        for path in paths:
+            track_gain, track_max_amp, track_min_gain, track_max_gain = self.analyze_track_metrics(
+                path,
+                include_gain=include_gain,
+            )
+            gain_sum += track_gain
+            if track_min_gain < min_gain:
+                min_gain = track_min_gain
+            if track_max_gain > max_gain:
+                max_gain = track_max_gain
+            if track_max_amp > max_amp:
+                max_amp = track_max_amp
+
+        album_gain = gain_sum / float(len(paths)) if include_gain else 0.0
+        if min_gain > max_gain:
+            return album_gain, 0, 0, max_amp
+        return album_gain, min_gain, max_gain, max_amp
 
     def compute_autoclip_steps(self, requested_steps: int, *, min_gain: int, max_gain: int) -> int:
         """Clamp requested step deltas to avoid legacy global_gain clipping."""

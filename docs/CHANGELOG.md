@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-03-10
+- Reduced legacy CLI runtime overhead by removing repeated `bytearray`->`bytes` copies in frame mutation loops and by collapsing duplicated decode passes via combined track/album metric analysis paths.
 - Enforced `legacy_cli` as a pure-Python runtime path by removing `mp3gain.exe` passthrough/delegation logic from `src/mp3gain_gui_py/legacy_cli.py`.
 - Added runtime unit coverage for `legacy_cli` Python execution paths (`/q /o /s r`, `/g`, `/m`, `/d`, `/u`) and regression checks that oracle passthrough symbols are absent.
 - Added per-branch `legacy_cli` unit coverage for check-only, delete-tag, direct gain, single-channel gain, track/album apply, undo, and clipping-guard paths.

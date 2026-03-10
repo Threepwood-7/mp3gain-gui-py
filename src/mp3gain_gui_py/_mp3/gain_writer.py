@@ -92,10 +92,10 @@ def apply_gain_change(
     first_audio_frame = True
 
     while True:
-        pos = find_next_frame(bytes(data), pos)
+        pos = find_next_frame(data, pos)
         if pos < 0:
             break
-        header = parse_frame_header(bytes(data), pos)
+        header = parse_frame_header(data, pos)
         if header is None:
             pos += 1
             continue
@@ -105,7 +105,7 @@ def apply_gain_change(
         # mp3gain.c skips the Xing/Info frame when present as first frame.
         if first_audio_frame:
             first_audio_frame = False
-            if has_xing_or_info_tag(bytes(data), pos, header):
+            if has_xing_or_info_tag(data, pos, header):
                 pos += header.frame_size_bytes
                 continue
 

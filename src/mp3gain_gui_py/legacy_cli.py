@@ -651,11 +651,17 @@ def main(argv: list[str] | None = None) -> int:
                 else single_existing.album_max_gain
             )
         else:
-            album_tag_gain = 0.0 if args.max_amp_only else processor.analyze_album_gain_db(existing_paths)
+            if hasattr(processor, "analyze_album_metrics"):
+                album_tag_gain, album_min_gain, album_max_gain, album_max_amp = processor.analyze_album_metrics(
+                    existing_paths,
+                    include_gain=not args.max_amp_only,
+                )
+            else:
+                album_tag_gain = 0.0 if args.max_amp_only else processor.analyze_album_gain_db(existing_paths)
+                album_min_gain, album_max_gain = processor.analyze_album_minmax_gain(existing_paths)
+                album_max_amp = max((processor.analyze_max_amplitude(path) for path in existing_paths), default=0.0)
             album_db_gain = album_tag_gain + args.db_mod
             album_steps = db_to_legacy_steps(album_db_gain, mp3_gain_mod=args.mp3_gain_mod)
-            album_min_gain, album_max_gain = processor.analyze_album_minmax_gain(existing_paths)
-            album_max_amp = max((processor.analyze_max_amplitude(path) for path in existing_paths), default=0.0)
         if args.apply_mode == "album" and args.auto_clip and album_steps is not None and album_max_amp is not None:
             max_no_clip = _max_no_clip_steps(album_max_amp)
             if max_no_clip is not None and album_steps > max_no_clip:
@@ -825,9 +831,15 @@ def main(argv: list[str] | None = None) -> int:
             min_gain = source_tags.min_gain or 0
             max_gain = source_tags.max_gain or 0
         else:
-            raw_gain = 0.0 if args.max_amp_only else processor.analyze_track_gain_db(path)
-            max_amp = processor.analyze_max_amplitude(path)
-            min_gain, max_gain = processor.analyze_minmax_gain(path)
+            if hasattr(processor, "analyze_track_metrics"):
+                raw_gain, max_amp, min_gain, max_gain = processor.analyze_track_metrics(
+                    path,
+                    include_gain=not args.max_amp_only,
+                )
+            else:
+                raw_gain = 0.0 if args.max_amp_only else processor.analyze_track_gain_db(path)
+                max_amp = processor.analyze_max_amplitude(path)
+                min_gain, max_gain = processor.analyze_minmax_gain(path)
             if args.stored_tag_policy in {"recalc", "skip"}:
                 if (
                     original_tags.track_peak is not None
