@@ -580,6 +580,8 @@ unsigned long reportPercentWritten(unsigned long percent, unsigned long bytes)
 {
     int ok = 1;
 
+
+
 #ifndef asWIN32DLL
     fprintf(stderr,"                                                \r %2lu%% of %lu bytes written\r"
         ,percent,bytes);
@@ -1078,6 +1080,269 @@ int changeGain(char *filename AACGAIN_ARG(AACGainHandle aacH), int leftgainchang
 
   NowWriting = 0;
 
+  return 0;
+}
+
+
+static int g_album_scan_active = 0;
+static int g_album_scan_initialized = 0;
+static long g_album_scan_last_rate_hz = 0;
+
+int scanFile(
+    char *filename,
+    int include_gain,
+    double *out_track_gain,
+    double *out_max_sample,
+    unsigned char *out_min_gain,
+    unsigned char *out_max_gain
+) {
+  MPSTR mp;
+  unsigned long ok;
+  int mode;
+  int crcflag;
+  unsigned char *Xingcheck;
+  int bitridx;
+  int freqidx;
+  long bytesinframe;
+  int nchan;
+  int sideinfo_len;
+  int mpegver;
+  int nprocsamp;
+  int decodeSuccess;
+  int analysisError;
+  int initRc;
+  int rc;
+  Float_t maxsample;
+  Float_t lsamples[1152];
+  Float_t rsamples[1152];
+  unsigned char maxgain;
+  unsigned char mingain;
+  double dBchange;
+
+  rc = 0;
+  ok = 0;
+  analysisError = 0;
+  decodeSuccess = 0;
+  initRc = 0;
+
+  if (filename == NULL || filename[0] == '\0' || out_track_gain == NULL || out_max_sample == NULL ||
+      out_min_gain == NULL || out_max_gain == NULL) {
+    passError(MP3GAIN_UNSPECIFED_ERROR, 1, "scanFile called with invalid arguments\n");
+    return M3G_ERR_FILEOPEN;
+  }
+
+  *out_track_gain = 0.0;
+  *out_max_sample = 0.0;
+  *out_min_gain = 0;
+  *out_max_gain = 0;
+
+  curfilename = filename;
+  maxAmpOnly = include_gain ? 0 : !0;
+
+  memset(&mp, 0, sizeof(mp));
+  InitMP3(&mp);
+
+  maxsample = 0.0f;
+  maxgain = 0;
+  mingain = 255;
+
+  BadLayer = 0;
+  LayerSet = Reckless;
+  inbuffer = 0;
+  filepos = 0;
+  bitidx = 0;
+
+  inf = fopen(filename, "rb");
+  if (inf == NULL) {
+    passError(MP3GAIN_UNSPECIFED_ERROR, 3, "Can't open ", filename, " for reading\n");
+    rc = M3G_ERR_FILEOPEN;
+    goto scan_cleanup;
+  }
+
+  ok = fillBuffer(0);
+  if (!ok) {
+    passError(MP3GAIN_UNSPECIFED_ERROR, 3, "Can't find any valid MP3 frames in file ", filename, "\n");
+    rc = MP3GAIN_FILEFORMAT_NOTSUPPORTED;
+    goto scan_cleanup;
+  }
+
+  wrdpntr = buffer;
+  ok = skipID3v2();
+  ok = frameSearch(!0);
+  if (!ok) {
+    if (!BadLayer) {
+      passError(MP3GAIN_UNSPECIFED_ERROR, 3, "Can't find any valid MP3 frames in file ", filename, "\n");
+    }
+    rc = MP3GAIN_FILEFORMAT_NOTSUPPORTED;
+    goto scan_cleanup;
+  }
+
+  LayerSet = 1;
+  mode = (curframe[3] >> 6) & 3;
+  if ((curframe[1] & 0x08) == 0x08) {
+    sideinfo_len = (mode == 3) ? 4 + 17 : 4 + 32;
+  } else {
+    sideinfo_len = (mode == 3) ? 4 + 9 : 4 + 17;
+  }
+  if (!(curframe[1] & 0x01)) {
+    sideinfo_len += 2;
+  }
+
+  Xingcheck = curframe + sideinfo_len;
+  if ((Xingcheck[0] == 'X' && Xingcheck[1] == 'i' && Xingcheck[2] == 'n' && Xingcheck[3] == 'g') ||
+      (Xingcheck[0] == 'I' && Xingcheck[1] == 'n' && Xingcheck[2] == 'f' && Xingcheck[3] == 'o')) {
+    bitridx = (curframe[2] >> 4) & 0x0F;
+    if (bitridx == 0) {
+      passError(MP3GAIN_FILEFORMAT_NOTSUPPORTED, 2, filename, " is free format (not currently supported)\n");
+      rc = MP3GAIN_FILEFORMAT_NOTSUPPORTED;
+      goto scan_cleanup;
+    }
+    mpegver = (curframe[1] >> 3) & 0x03;
+    freqidx = (curframe[2] >> 2) & 0x03;
+    bytesinframe = arrbytesinframe[bitridx] + ((curframe[2] >> 1) & 0x01);
+    wrdpntr = curframe + bytesinframe;
+    ok = frameSearch(0);
+    if (!ok) {
+      passError(MP3GAIN_UNSPECIFED_ERROR, 3, "Can't find any valid MP3 frames in file ", filename, "\n");
+      rc = MP3GAIN_FILEFORMAT_NOTSUPPORTED;
+      goto scan_cleanup;
+    }
+  }
+
+  if (include_gain) {
+    long analysisRateHz;
+    mpegver = (curframe[1] >> 3) & 0x03;
+    freqidx = (curframe[2] >> 2) & 0x03;
+    analysisRateHz = (long)(frequency[mpegver][freqidx] * 1000.0);
+    if (g_album_scan_active) {
+      if (!g_album_scan_initialized) {
+        initRc = InitGainAnalysis(analysisRateHz);
+        if (initRc != INIT_GAIN_ANALYSIS_OK) {
+          passError(MP3GAIN_UNSPECIFED_ERROR, 1, "InitGainAnalysis failed\n");
+          rc = initRc;
+          goto scan_cleanup;
+        }
+        g_album_scan_initialized = 1;
+      } else if (g_album_scan_last_rate_hz != analysisRateHz) {
+        initRc = ResetSampleFrequency(analysisRateHz);
+        if (initRc != INIT_GAIN_ANALYSIS_OK) {
+          passError(MP3GAIN_UNSPECIFED_ERROR, 1, "ResetSampleFrequency failed\n");
+          rc = initRc;
+          goto scan_cleanup;
+        }
+      }
+      g_album_scan_last_rate_hz = analysisRateHz;
+    } else {
+      lastfreq = frequency[mpegver][freqidx];
+      initRc = InitGainAnalysis((long)(lastfreq * 1000.0));
+      if (initRc != INIT_GAIN_ANALYSIS_OK) {
+        passError(MP3GAIN_UNSPECIFED_ERROR, 1, "InitGainAnalysis failed\n");
+        rc = initRc;
+        goto scan_cleanup;
+      }
+    }
+  }
+
+  while (ok && (!blnCancel)) {
+    bitridx = (curframe[2] >> 4) & 0x0F;
+    if (bitridx == 0) {
+      passError(MP3GAIN_FILEFORMAT_NOTSUPPORTED, 2, filename, " is free format (not currently supported)\n");
+      rc = MP3GAIN_FILEFORMAT_NOTSUPPORTED;
+      break;
+    }
+
+    mpegver = (curframe[1] >> 3) & 0x03;
+    crcflag = curframe[1] & 0x01;
+    freqidx = (curframe[2] >> 2) & 0x03;
+    bytesinframe = arrbytesinframe[bitridx] + ((curframe[2] >> 1) & 0x01);
+    mode = (curframe[3] >> 6) & 0x03;
+    nchan = (mode == 3) ? 1 : 2;
+
+    if (inbuffer >= bytesinframe) {
+      lSamp = lsamples;
+      rSamp = rsamples;
+      maxSamp = &maxsample;
+      maxGain = &maxgain;
+      minGain = &mingain;
+      procSamp = 0;
+
+      decodeSuccess = decodeMP3(&mp, curframe, bytesinframe, &nprocsamp);
+      if (decodeSuccess == MP3_OK && include_gain) {
+        if (AnalyzeSamples(lsamples, rsamples, procSamp / nchan, nchan) == GAIN_ANALYSIS_ERROR) {
+          passError(MP3GAIN_UNSPECIFED_ERROR, 1, "Error analyzing further samples (max time reached)\n");
+          analysisError = !0;
+          rc = MP3GAIN_UNSPECIFED_ERROR;
+          break;
+        }
+      }
+    }
+
+    if (!analysisError) {
+      wrdpntr = curframe + bytesinframe;
+      ok = frameSearch(0);
+    } else {
+      ok = 0;
+    }
+  }
+
+  if (blnCancel) {
+    passError(MP3GAIN_CANCELLED, 1, "Operation cancelled\n");
+    rc = MP3GAIN_CANCELLED;
+    goto scan_cleanup;
+  }
+
+  if (rc != 0) {
+    goto scan_cleanup;
+  }
+
+  if (include_gain) {
+    dBchange = GetTitleGain();
+    if (dBchange == GAIN_NOT_ENOUGH_SAMPLES) {
+      passError(MP3GAIN_UNSPECIFED_ERROR, 3, "Not enough samples in ", filename, " to do analysis\n");
+      rc = MP3GAIN_UNSPECIFED_ERROR;
+      goto scan_cleanup;
+    }
+    *out_track_gain = dBchange;
+  }
+
+  *out_max_sample = maxsample;
+  *out_min_gain = mingain;
+  *out_max_gain = maxgain;
+
+scan_cleanup:
+  ExitMP3(&mp);
+  if (inf != NULL) {
+    fclose(inf);
+    inf = NULL;
+  }
+  return rc;
+}
+
+int beginAlbumScan(void)
+{
+  g_album_scan_active = 1;
+  g_album_scan_initialized = 0;
+  g_album_scan_last_rate_hz = 0;
+  return 0;
+}
+
+int finishAlbumScan(double *out_album_gain)
+{
+  if (out_album_gain == NULL) {
+    passError(MP3GAIN_UNSPECIFED_ERROR, 1, "finishAlbumScan requires output pointer\n");
+    return MP3GAIN_UNSPECIFED_ERROR;
+  }
+  if (!g_album_scan_active || !g_album_scan_initialized) {
+    passError(MP3GAIN_UNSPECIFED_ERROR, 1, "finishAlbumScan called without active album analysis\n");
+    g_album_scan_active = 0;
+    g_album_scan_initialized = 0;
+    g_album_scan_last_rate_hz = 0;
+    return MP3GAIN_UNSPECIFED_ERROR;
+  }
+  *out_album_gain = GetAlbumGain();
+  g_album_scan_active = 0;
+  g_album_scan_initialized = 0;
+  g_album_scan_last_rate_hz = 0;
   return 0;
 }
 

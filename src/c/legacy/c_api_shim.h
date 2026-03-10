@@ -58,6 +58,16 @@ MP3G_BACKEND_EXPORT int mp3g_backend_analyzer_feed_f64(
 );
 MP3G_BACKEND_EXPORT double mp3g_backend_analyzer_get_title_gain(void);
 MP3G_BACKEND_EXPORT double mp3g_backend_analyzer_get_album_gain(void);
+MP3G_BACKEND_EXPORT int mp3g_backend_scan_file(
+    const char *filename,
+    int include_gain,
+    double *out_track_gain,
+    double *out_max_sample,
+    int *out_min_gain,
+    int *out_max_gain
+);
+MP3G_BACKEND_EXPORT int mp3g_backend_album_scan_begin(void);
+MP3G_BACKEND_EXPORT int mp3g_backend_album_scan_finish(double *out_album_gain);
 
 MP3G_BACKEND_EXPORT int mp3g_backend_apply_gain_file(
     const char *filename,

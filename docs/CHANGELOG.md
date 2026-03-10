@@ -1,6 +1,10 @@
 # Changelog
 
 ## 2026-03-10
+- Enforced DLL-only runtime execution for `legacy_cli`: removed Python runtime fallback behavior from `LegacyExactProcessor` paths and made C backend initialization mandatory.
+- Extended the vendored C shim/backend ABI with file-scan and album-scan lifecycle exports so analysis (`track gain`, `album gain`, `max amplitude`, `min/max global_gain`) runs through legacy C code.
+- Corrected APE tag write behavior in the C shim so caller-provided MP3Gain values are not clobbered by existing in-file tag reads during write operations.
+- Updated `legacy_cli` runtime output/parity behavior for `/q /r` apply flows and revalidated oracle parity on random sample files for `/o /s r`, `/g` (89/87/81 lanes), `/m`, and `/d` with byte-level parity.
 - Tightened runtime documentation in `AGENTS.md` and `README.md`: pure-Python runtime paths are now explicitly declared reference-only, unsupported, and not maintained/tested.
 - Updated `README.md` to explicitly define the DLL-backed vendored C runtime as canonical for `legacy_cli`, and to mark pure-Python paths as migration/test fallback only.
 - Clarified `AGENTS.md` runtime contract: Python `legacy_cli` now relies on the ported DLL backend as canonical execution, while full pure-Python runtime parity is retired and only opt-in migration/test fallbacks remain.

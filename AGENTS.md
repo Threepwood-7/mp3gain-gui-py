@@ -23,7 +23,7 @@ Target feature parity: VB6 GUI v1.2.5.
 - The authoritative runtime C sources are vendored under `src/c/legacy` and built with MinGW.
 - Python runtime orchestration must call the DLL shim for analyze/apply/undo/tag operations.
 - The pure-Python runtime implementation is reference-only, and is not maintained or tested.
-- Any Python fallback paths are unsupported and must stay opt-in (never default).
+- There is no supported Python runtime fallback path; C backend initialization failure is fatal for runtime execution.
 - Do not delegate runtime flow to external `mp3gain.exe`.
 - `C:/bin/mp3gain-win-1_2_5/mp3gain.exe` is oracle-only for parity/validation tooling (for example `scripts/parity_*`), not a runtime backend.
 

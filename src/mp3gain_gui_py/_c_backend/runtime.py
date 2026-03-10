@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import ctypes
 import threading
-from array import array
-from ctypes import POINTER, c_char_p, c_double, c_int, c_long, c_size_t
+from ctypes import POINTER, byref, c_char_p, c_double, c_int, c_long, c_size_t
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
 
-from .._engine.pcm_reader import decode_to_stereo_chunks, read_mp3_info
 from .._tags.reader import TagData
 from .build import backend_dll_path, build_backend
 
@@ -70,6 +68,9 @@ class _DllFns:
     analyzer_feed_f64: Any
     analyzer_get_title_gain: Any
     analyzer_get_album_gain: Any
+    scan_file: Any
+    album_scan_begin: Any
+    album_scan_finish: Any
     apply_gain_file: Any
     read_tags: Any
     write_tags: Any
@@ -143,6 +144,25 @@ class LegacyCBackend:
         analyzer_get_album_gain.argtypes = []
         analyzer_get_album_gain.restype = c_double
 
+        scan_file = dll.mp3g_backend_scan_file
+        scan_file.argtypes = [
+            c_char_p,
+            c_int,
+            POINTER(c_double),
+            POINTER(c_double),
+            POINTER(c_int),
+            POINTER(c_int),
+        ]
+        scan_file.restype = c_int
+
+        album_scan_begin = dll.mp3g_backend_album_scan_begin
+        album_scan_begin.argtypes = []
+        album_scan_begin.restype = c_int
+
+        album_scan_finish = dll.mp3g_backend_album_scan_finish
+        album_scan_finish.argtypes = [POINTER(c_double)]
+        album_scan_finish.restype = c_int
+
         apply_gain_file = dll.mp3g_backend_apply_gain_file
         apply_gain_file.argtypes = [c_char_p, c_int, c_int, c_int, c_int, c_int]
         apply_gain_file.restype = c_int
@@ -170,6 +190,9 @@ class LegacyCBackend:
             analyzer_feed_f64=analyzer_feed_f64,
             analyzer_get_title_gain=analyzer_get_title_gain,
             analyzer_get_album_gain=analyzer_get_album_gain,
+            scan_file=scan_file,
+            album_scan_begin=album_scan_begin,
+            album_scan_finish=album_scan_finish,
             apply_gain_file=apply_gain_file,
             read_tags=read_tags,
             write_tags=write_tags,
@@ -192,37 +215,50 @@ class LegacyCBackend:
         except UnicodeEncodeError as exc:
             raise CBackendPathError(f"Path cannot be encoded for legacy C runtime: {path}") from exc
 
-    @staticmethod
-    def _to_c_double_buffer(values: list[float]) -> tuple[array, ctypes.Array[c_double]]:
-        arr = array("d", values)
-        c_arr = (c_double * len(arr)).from_buffer(arr)
-        return arr, c_arr
-
     def analyze_track_gain_and_peak(self, path: Path) -> tuple[float, float]:
-        sample_rate, _channels = read_mp3_info(path)
+        gain_db, max_amp, _min_gain, _max_gain = self.scan_track_metrics(path, include_gain=True)
+        return gain_db, max_amp
 
+    def scan_track_metrics(
+        self,
+        path: Path,
+        *,
+        include_gain: bool = True,
+    ) -> tuple[float, float, int, int]:
+        path_bytes = self._encode_path(path)
+        gain_db = c_double(0.0)
+        max_amp = c_double(0.0)
+        min_gain = c_int(0)
+        max_gain = c_int(0)
         with self._lock:
             self._fns.reset_error()
-            init_rc = self._fns.analyzer_init(sample_rate)
-            if init_rc != 0:
-                raise CBackendError(self._read_last_error(default_message="analyzer init failed"))
+            rc = self._fns.scan_file(
+                path_bytes,
+                1 if include_gain else 0,
+                byref(gain_db),
+                byref(max_amp),
+                byref(min_gain),
+                byref(max_gain),
+            )
+            if rc != 0:
+                raise CBackendError(self._read_last_error(default_message="scan file failed"))
+        return float(gain_db.value), float(max_amp.value), int(min_gain.value), int(max_gain.value)
 
-            max_amp = 0.0
-            for _sr, left, right in decode_to_stereo_chunks(path, chunk_frames=8192):
-                left_pair = self._to_c_double_buffer(left)
-                right_pair = self._to_c_double_buffer(right)
-                feed_rc = self._fns.analyzer_feed_f64(left_pair[1], right_pair[1], len(left), 2)
-                if feed_rc != 0:
-                    raise CBackendError(self._read_last_error(default_message="analyzer feed failed"))
-                left_peak = max((abs(v) for v in left), default=0.0)
-                right_peak = max((abs(v) for v in right), default=0.0)
-                if left_peak > max_amp:
-                    max_amp = left_peak
-                if right_peak > max_amp:
-                    max_amp = right_peak
+    def begin_album_scan(self) -> None:
+        with self._lock:
+            self._fns.reset_error()
+            rc = self._fns.album_scan_begin()
+            if rc != 0:
+                raise CBackendError(self._read_last_error(default_message="album scan begin failed"))
 
-            gain_db = float(self._fns.analyzer_get_title_gain())
-            return gain_db, max_amp
+    def finish_album_scan(self) -> float:
+        gain_db = c_double(0.0)
+        with self._lock:
+            self._fns.reset_error()
+            rc = self._fns.album_scan_finish(byref(gain_db))
+            if rc != 0:
+                raise CBackendError(self._read_last_error(default_message="album scan finish failed"))
+        return float(gain_db.value)
 
     def apply_gain_file(
         self,

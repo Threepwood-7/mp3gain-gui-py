@@ -1,11 +1,18 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import mp3gain_gui_py.legacy_cli as legacy_cli
-import pytest
-from mp3gain_gui_py._legacy_exact.processor import LegacyCommandResult, LegacyCompatOptions
+from mp3gain_gui_py._legacy_exact.processor import (
+    LegacyCommandResult,
+    LegacyCompatOptions,
+)
 from mp3gain_gui_py._tags.reader import TagData
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
 
 
 class _FakeProcessor:
@@ -66,6 +73,10 @@ class _FakeProcessor:
         self.undo_paths.append(path)
         return LegacyCommandResult(exit_code=0, changed=True)
 
+    def read_replaygain_tags(self, path: Path) -> TagData:
+        _ = path
+        return TagData(tag_format="none")
+
 
 def _install_fake_processor(monkeypatch: pytest.MonkeyPatch) -> _FakeProcessor:
     fake = _FakeProcessor()
@@ -73,7 +84,7 @@ def _install_fake_processor(monkeypatch: pytest.MonkeyPatch) -> _FakeProcessor:
     monkeypatch.setattr(
         legacy_cli,
         "_write_runtime_tags",
-        lambda _path, _tags, *, tag_format, preserve_timestamp: None,
+        lambda _processor, _path, _tags, *, tag_format, preserve_timestamp: None,
     )
     return fake
 
@@ -120,7 +131,11 @@ def test_runtime_modifiers_m_and_d_execute_python_path(
     target = tmp_path / "sample.mp3"
     target.write_bytes(b"x")
     fake = _install_fake_processor(monkeypatch)
-    monkeypatch.setattr(legacy_cli, "read_tags", lambda _path: TagData(tag_format="none"))
+    monkeypatch.setattr(
+        legacy_cli,
+        "_load_runtime_tags",
+        lambda _processor, _path, *, tag_format: TagData(tag_format="none"),
+    )
 
     code = legacy_cli.main(["/m", "1", "/d", "1.5", str(target)])
     out = capsys.readouterr().out
@@ -136,8 +151,13 @@ def test_runtime_undo_uses_python_processor(monkeypatch: pytest.MonkeyPatch, tmp
     fake = _install_fake_processor(monkeypatch)
     monkeypatch.setattr(
         legacy_cli,
-        "read_tags",
-        lambda _path: TagData(tag_format="apev2", undo_left=2, undo_right=2, undo_mode="N"),
+        "_load_runtime_tags",
+        lambda _processor, _path, *, tag_format: TagData(
+            tag_format="apev2",
+            undo_left=2,
+            undo_right=2,
+            undo_mode="N",
+        ),
     )
 
     code = legacy_cli.main(["/q", "/u", str(target)])

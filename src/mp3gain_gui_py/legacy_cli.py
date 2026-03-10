@@ -7,11 +7,10 @@ Legacy Pointers:
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
 import math
-import os
-from pathlib import Path
 import sys
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 from ._legacy_exact import (
@@ -21,8 +20,7 @@ from ._legacy_exact import (
     db_to_legacy_steps,
 )
 from ._legacy_exact.math import legacy_steps_to_db_exact
-from ._tags.reader import TagData, read_tags
-from ._tags.writer import write_tags
+from ._tags.reader import TagData
 
 ApplyMode = Literal["none", "track", "album"]
 
@@ -331,8 +329,13 @@ def _print_info(mode: Literal["none", "version", "help", "help_qmark"], topic: s
             print(f"Help topic: {topic}")
 
 
-def _load_runtime_tags(path: Path, *, tag_format: Literal["apev2", "id3"]) -> TagData:
-    tags = read_tags(path)
+def _load_runtime_tags(
+    processor: LegacyExactProcessor,
+    path: Path,
+    *,
+    tag_format: Literal["apev2", "id3"],
+) -> TagData:
+    tags = processor.read_replaygain_tags(path)
     # Legacy binary defaults to APEv2 mode and ignores ID3-only ReplayGain tags.
     if tag_format == "apev2" and tags.tag_format == "id3":
         return TagData(tag_format="none")
@@ -476,24 +479,25 @@ def _apply_gain_and_update_tags(
 
 
 def _write_runtime_tags(
+    processor: LegacyExactProcessor,
     path: Path,
     tags: TagData,
     *,
     tag_format: Literal["apev2", "id3"],
     preserve_timestamp: bool,
 ) -> None:
-    stamp: os.stat_result | None = None
-    if preserve_timestamp:
-        stamp = path.stat()
-    write_tags(path, tags, tag_format=tag_format)
-    if stamp is not None:
-        os.utime(path, (stamp.st_atime, stamp.st_mtime))
+    processor.write_replaygain_tagdata(
+        path,
+        tags,
+        tag_format=tag_format,
+        preserve_timestamp=preserve_timestamp,
+    )
 
 
 def _max_no_clip_steps(max_amp: float) -> int | None:
     if max_amp <= 0.0:
         return None
-    return int(math.floor(4.0 * math.log10(32767.0 / max_amp) / math.log10(2.0)))
+    return math.floor(4.0 * math.log10(32767.0 / max_amp) / math.log10(2.0))
 
 
 def _would_clip(max_amp: float, gain_steps: int) -> bool:
@@ -587,7 +591,11 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print("File\tMP3 gain\tdB gain\tMax Amplitude\tMax global_gain\tMin global_gain")
 
-    processor = LegacyExactProcessor()
+    try:
+        processor = LegacyExactProcessor()
+    except Exception as exc:  # pragma: no cover - defensive for CLI surface
+        print(f"ERROR: failed to initialize C backend: {exc}", file=sys.stderr)
+        return 1
     options = _default_options(args)
 
     existing_paths = [path for path in args.files if path.exists()]
@@ -609,7 +617,6 @@ def main(argv: list[str] | None = None) -> int:
     album_min_gain: int | None = None
     album_max_gain: int | None = None
     album_tag_gain: float = 0.0
-    album_summary_from_existing_tags = False
     single_track_album_override: tuple[int, float, float, int, int] | None = None
 
     if album_summary_enabled:
@@ -619,7 +626,7 @@ def main(argv: list[str] | None = None) -> int:
             and args.stored_tag_policy == "auto"
             and args.stored_tag_policy != "recalc"
         ):
-            candidate = _load_runtime_tags(existing_paths[0], tag_format=args.tag_format)
+            candidate = _load_runtime_tags(processor, existing_paths[0], tag_format=args.tag_format)
             if (
                 candidate.track_gain_db is not None
                 and candidate.track_peak is not None
@@ -629,7 +636,6 @@ def main(argv: list[str] | None = None) -> int:
                 single_existing = candidate
 
         if single_existing is not None:
-            album_summary_from_existing_tags = True
             if single_existing.album_gain_db is not None:
                 album_tag_gain = single_existing.album_gain_db
             else:
@@ -677,21 +683,20 @@ def main(argv: list[str] | None = None) -> int:
 
         # Branch ordering intentionally follows legacy behavior classes.
         if args.stored_tag_policy == "check_only":
-            tags = _load_runtime_tags(path, tag_format=args.tag_format)
+            tags = _load_runtime_tags(processor, path, tag_format=args.tag_format)
             if args.table_output:
                 print(_format_check_only_table_line(path, tags))
-            elif not args.quiet:
-                if tags.track_gain_db is not None:
-                    steps = db_to_legacy_steps(tags.track_gain_db, mp3_gain_mod=0)
-                    db_gain = tags.track_gain_db
-                    print(
-                        f'Recommended "Track" dB change: {db_gain:.6f}\n'
-                        f'Recommended "Track" mp3 gain change: {steps}\n'
-                        f'Applied step dB (exact): {legacy_steps_to_db_exact(steps):.6f}'
-                    )
+            elif not args.quiet and tags.track_gain_db is not None:
+                steps = db_to_legacy_steps(tags.track_gain_db, mp3_gain_mod=0)
+                db_gain = tags.track_gain_db
+                print(
+                    f'Recommended "Track" dB change: {db_gain:.6f}\n'
+                    f'Recommended "Track" mp3 gain change: {steps}\n'
+                    f'Applied step dB (exact): {legacy_steps_to_db_exact(steps):.6f}'
+                )
             continue
 
-        loaded_tags = _load_runtime_tags(path, tag_format=args.tag_format)
+        loaded_tags = _load_runtime_tags(processor, path, tag_format=args.tag_format)
         tags = loaded_tags if not skip_tag_updates else TagData()
         original_tags = copy.deepcopy(loaded_tags)
         tag_dirty = False
@@ -720,6 +725,7 @@ def main(argv: list[str] | None = None) -> int:
                     wrap_gain=args.wrap_gain,
                 )
                 _write_runtime_tags(
+                    processor,
                     path,
                     tags,
                     tag_format=args.tag_format,
@@ -752,6 +758,7 @@ def main(argv: list[str] | None = None) -> int:
                         wrap_gain=args.wrap_gain,
                     )
                     _write_runtime_tags(
+                        processor,
                         path,
                         tags,
                         tag_format=args.tag_format,
@@ -771,6 +778,7 @@ def main(argv: list[str] | None = None) -> int:
                     wrap_gain=args.wrap_gain,
                 )
                 _write_runtime_tags(
+                    processor,
                     path,
                     tags,
                     tag_format=args.tag_format,
@@ -793,6 +801,7 @@ def main(argv: list[str] | None = None) -> int:
                     wrap_gain=args.wrap_gain,
                 )
                 _write_runtime_tags(
+                    processor,
                     path,
                     tags,
                     tag_format=args.tag_format,
@@ -902,6 +911,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{path}\tERROR\tclipping risk; rerun with /c or /k")
             if not skip_tag_updates and tag_dirty:
                 _write_runtime_tags(
+                    processor,
                     path,
                     tags,
                     tag_format=args.tag_format,
@@ -915,6 +925,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{path}\tERROR\tclipping risk; rerun with /c or /k")
             if not skip_tag_updates and tag_dirty:
                 _write_runtime_tags(
+                    processor,
                     path,
                     tags,
                     tag_format=args.tag_format,
@@ -923,6 +934,9 @@ def main(argv: list[str] | None = None) -> int:
             continue
 
         if args.apply_mode in {"track", "album"} and applied_steps != 0:
+            if not args.table_output:
+                print(path)
+                print(f"Applying mp3 gain change of {applied_steps} to {path}...")
             result = processor.apply_steps(path, left_steps=applied_steps, options=options)
             if result.exit_code != 0:
                 failures += 1
@@ -940,6 +954,7 @@ def main(argv: list[str] | None = None) -> int:
 
         if not skip_tag_updates and tag_dirty:
             _write_runtime_tags(
+                processor,
                 path,
                 tags,
                 tag_format=args.tag_format,

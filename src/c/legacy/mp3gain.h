@@ -46,6 +46,16 @@
 #ifdef asWIN32DLL
 
 int changeGain(char *filename, int leftgainchange, int rightgainchange);
+int scanFile(
+    char *filename,
+    int include_gain,
+    double *out_track_gain,
+    double *out_max_sample,
+    unsigned char *out_min_gain,
+    unsigned char *out_max_gain
+);
+int beginAlbumScan(void);
+int finishAlbumScan(double *out_album_gain);
 
 #endif 
 

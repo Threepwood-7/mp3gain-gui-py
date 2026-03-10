@@ -227,6 +227,86 @@ double mp3g_backend_analyzer_get_album_gain(void)
     return GetAlbumGain();
 }
 
+int mp3g_backend_scan_file(
+    const char *filename,
+    int include_gain,
+    double *out_track_gain,
+    double *out_max_sample,
+    int *out_min_gain,
+    int *out_max_gain
+)
+{
+    int rc;
+    unsigned char min_gain;
+    unsigned char max_gain;
+    double title_gain;
+    double max_sample;
+
+    if (filename == NULL || out_track_gain == NULL || out_max_sample == NULL ||
+        out_min_gain == NULL || out_max_gain == NULL) {
+        backend_set_error_message(-1, "filename and output pointers are required");
+        return -1;
+    }
+
+    title_gain = 0.0;
+    max_sample = 0.0;
+    min_gain = 0;
+    max_gain = 0;
+
+    mp3g_backend_reset_error();
+    rc = scanFile(
+        (char *)filename,
+        include_gain ? 1 : 0,
+        &title_gain,
+        &max_sample,
+        &min_gain,
+        &max_gain
+    );
+    backend_capture_legacy_error_if_any();
+    if (rc != 0) {
+        if (mp3g_backend_get_last_error_code() == 0) {
+            backend_set_error_message(rc, "scanFile failed");
+        }
+        return rc;
+    }
+
+    *out_track_gain = title_gain;
+    *out_max_sample = max_sample;
+    *out_min_gain = (int)min_gain;
+    *out_max_gain = (int)max_gain;
+    return 0;
+}
+
+int mp3g_backend_album_scan_begin(void)
+{
+    mp3g_backend_reset_error();
+    if (beginAlbumScan() != 0) {
+        backend_capture_legacy_error_if_any();
+        backend_set_error_message(-1, "beginAlbumScan failed");
+        return -1;
+    }
+    return 0;
+}
+
+int mp3g_backend_album_scan_finish(double *out_album_gain)
+{
+    int rc;
+    if (out_album_gain == NULL) {
+        backend_set_error_message(-1, "out_album_gain is required");
+        return -1;
+    }
+    mp3g_backend_reset_error();
+    rc = finishAlbumScan(out_album_gain);
+    backend_capture_legacy_error_if_any();
+    if (rc != 0) {
+        if (mp3g_backend_get_last_error_code() == 0) {
+            backend_set_error_message(rc, "finishAlbumScan failed");
+        }
+        return rc;
+    }
+    return 0;
+}
+
 int mp3g_backend_apply_gain_file(
     const char *filename,
     int left_gain_steps,
@@ -304,6 +384,7 @@ int mp3g_backend_write_tags(
 {
     int rc;
     struct MP3GainTagInfo tag_info;
+    struct MP3GainTagInfo existing_tag_info;
     struct FileTagsStruct file_tags;
 
     if (filename == NULL || in_info == NULL) {
@@ -313,10 +394,12 @@ int mp3g_backend_write_tags(
 
     mp3g_backend_reset_error();
     memset(&file_tags, 0, sizeof(file_tags));
+    memset(&existing_tag_info, 0, sizeof(existing_tag_info));
     backend_from_in_info(in_info, &tag_info);
 
     if (tag_format == MP3G_TAG_FORMAT_APEV2) {
-        (void)ReadMP3GainAPETag((char *)filename, &tag_info, &file_tags);
+        /* Load side tag containers from file, but keep caller-provided MP3Gain values intact. */
+        (void)ReadMP3GainAPETag((char *)filename, &existing_tag_info, &file_tags);
         rc = WriteMP3GainAPETag((char *)filename, &tag_info, &file_tags, preserve_timestamp_flag ? 1 : 0);
         backend_free_file_tags(&file_tags);
         if (rc > 0) {
