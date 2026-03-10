@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-03-10
+- Replaced `PERF.md` baseline content with the latest DLL-backed `legacy_cli` parity/performance execution report (6 random files), superseding the earlier python-only baseline metrics.
+- Normalized the vendored legacy C source tree (`src/c/legacy`) to UTF-8 encoding (no BOM) with LF-only line endings.
 - Enforced DLL-only runtime execution for `legacy_cli`: removed Python runtime fallback behavior from `LegacyExactProcessor` paths and made C backend initialization mandatory.
 - Extended the vendored C shim/backend ABI with file-scan and album-scan lifecycle exports so analysis (`track gain`, `album gain`, `max amplitude`, `min/max global_gain`) runs through legacy C code.
 - Corrected APE tag write behavior in the C shim so caller-provided MP3Gain values are not clobbered by existing in-file tag reads during write operations.

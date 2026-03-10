@@ -24,7 +24,7 @@
  *       Just do me a favor and let me know how you improve the code.
  *       Thanks.
  *
- *  Unix-ification by Stefan Partheymüller
+ *  Unix-ification by Stefan PartheymÃ¼ller
  *  (other people have made Unix-compatible alterations-- I just ended up using
  *   Stefan's because it involved the least re-work)
  *
