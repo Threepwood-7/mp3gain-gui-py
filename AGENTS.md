@@ -21,6 +21,9 @@ Target feature parity: VB6 GUI v1.2.5.
 
 - `src/mp3gain_gui_py/legacy_cli.py` is C-library-backed by default via `src/mp3gain_gui_py/_c_backend`.
 - The authoritative runtime C sources are vendored under `src/c/legacy` and built with MinGW.
+- Python runtime orchestration must call the DLL shim for analyze/apply/undo/tag operations.
+- The pure-Python runtime implementation is reference-only, and is not maintained or tested.
+- Any Python fallback paths are unsupported and must stay opt-in (never default).
 - Do not delegate runtime flow to external `mp3gain.exe`.
 - `C:/bin/mp3gain-win-1_2_5/mp3gain.exe` is oracle-only for parity/validation tooling (for example `scripts/parity_*`), not a runtime backend.
 
@@ -70,12 +73,15 @@ Pre-processed to 89 dB reference output is at `c:\tmp\mp3\89db\`.
 
 ```
 src/mp3gain_gui_py/
+  _c_backend/
+    build.py          MinGW DLL build orchestration
+    runtime.py        ctypes bindings to shim exports
   _engine/
-    coefficients.py   IIR tables verbatim from gain_analysis.c
-    filter_py.py      Pure-Python Yule + Butterworth IIR
-    filter_np.py      NumPy-accelerated version (auto-selected at import)
-    replaygain.py     GainAnalyzer class
-    pcm_reader.py     miniaudio -> float32 PCM, scaled to PCM-16 range
+    coefficients.py   IIR tables mirrored from gain_analysis.c (reference only)
+    filter_py.py      Legacy pure-Python filter path (reference only, not maintained/tested)
+    filter_np.py      NumPy-accelerated legacy filter path (reference only, not maintained/tested)
+    replaygain.py     Legacy analyzer retained as reference-only code
+    pcm_reader.py     PCM decode helpers retained as reference-only code
   _mp3/
     frame_parser.py   FrameHeader + global_gain bit offsets
     crc.py            CRC-16 for protected frames

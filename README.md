@@ -31,7 +31,7 @@ PySide6 port of MP3Gain GUI - ReplayGain analysis and gain adjustment
 
 - **Windows** (10 or later)
 
-- **MinGW GCC** (required for local C backend build)
+- **MinGW GCC** (required to build the vendored C runtime DLL)
 
 
 ## Installation
@@ -74,6 +74,9 @@ python -m mp3gain_gui_py.legacy_cli /q /o /s r "song.mp3"
 ```bat
 python scripts\build_legacy_c_backend.py
 ```
+
+`legacy_cli` and runtime processing call the vendored C backend DLL (via `ctypes`) as the canonical execution path.
+The pure-Python runtime code is retained only as reference and is not maintained or tested.
 
 ### Normalize 89 dB Helper
 
@@ -167,7 +170,9 @@ Behavior notes:
 - `/r` and `/a`: if both are present, the last one wins.
 - `/g` and `/l` are direct apply modes (bypass normal analysis/recommend flow).
 - Legacy MP3 global gain math is step-based, so exact dB targets can round to nearest step.
-- `legacy_cli` runtime execution is C-library-backed (`src/c/legacy` + `ctypes` binding).
+- `legacy_cli` runtime execution is DLL-backed from vendored C sources (`src/c/legacy` + `src/mp3gain_gui_py/_c_backend`).
+- Pure-Python runtime code is reference-only and is not maintained or tested.
+- Fallback forcing with `MP3GAIN_GUI_PY_DISABLE_C_BACKEND=1` is unsupported and debug-only.
 - Local `mp3gain.exe` remains oracle-only for parity/benchmark scripts and must not be used as runtime backend.
 
 ### Tag Behavior and Player Compatibility

@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-03-10
+- Tightened runtime documentation in `AGENTS.md` and `README.md`: pure-Python runtime paths are now explicitly declared reference-only, unsupported, and not maintained/tested.
+- Updated `README.md` to explicitly define the DLL-backed vendored C runtime as canonical for `legacy_cli`, and to mark pure-Python paths as migration/test fallback only.
+- Clarified `AGENTS.md` runtime contract: Python `legacy_cli` now relies on the ported DLL backend as canonical execution, while full pure-Python runtime parity is retired and only opt-in migration/test fallbacks remain.
 - Migrated runtime architecture to C-first execution by vendoring `mp3gain-1_5_2-src` into `src/c/legacy` and adding a stable shim API (`c_api_shim.c/.h`) for Python FFI integration.
 - Added deterministic MinGW build flow for runtime DLL generation:
   - Python build helper module: `src/mp3gain_gui_py/_c_backend/build.py`
