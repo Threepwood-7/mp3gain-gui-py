@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-03-10
+- Imported legacy upstream source snapshot `c:/prj/misc/mp3gain/mp3gain-1_6_2-src` into `src/c/legacy/mp3gain-1_6_2-src`, normalized to UTF-8 (no BOM) and LF-only line endings.
 - Relocated vendored legacy C sources from `src/c/legacy` to `src/c/legacy/mp3gain-1_5_2-src` and updated backend build/runtime documentation pointers to the nested source root.
 - Replaced `PERF.md` baseline content with the latest DLL-backed `legacy_cli` parity/performance execution report (6 random files), superseding the earlier python-only baseline metrics.
 - Normalized the vendored legacy C source tree (`src/c/legacy/mp3gain-1_5_2-src`) to UTF-8 encoding (no BOM) with LF-only line endings.
