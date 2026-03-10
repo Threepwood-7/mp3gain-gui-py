@@ -1,8 +1,9 @@
 # Changelog
 
 ## 2026-03-10
+- Relocated vendored legacy C sources from `src/c/legacy` to `src/c/legacy/mp3gain-1_5_2-src` and updated backend build/runtime documentation pointers to the nested source root.
 - Replaced `PERF.md` baseline content with the latest DLL-backed `legacy_cli` parity/performance execution report (6 random files), superseding the earlier python-only baseline metrics.
-- Normalized the vendored legacy C source tree (`src/c/legacy`) to UTF-8 encoding (no BOM) with LF-only line endings.
+- Normalized the vendored legacy C source tree (`src/c/legacy/mp3gain-1_5_2-src`) to UTF-8 encoding (no BOM) with LF-only line endings.
 - Enforced DLL-only runtime execution for `legacy_cli`: removed Python runtime fallback behavior from `LegacyExactProcessor` paths and made C backend initialization mandatory.
 - Extended the vendored C shim/backend ABI with file-scan and album-scan lifecycle exports so analysis (`track gain`, `album gain`, `max amplitude`, `min/max global_gain`) runs through legacy C code.
 - Corrected APE tag write behavior in the C shim so caller-provided MP3Gain values are not clobbered by existing in-file tag reads during write operations.
@@ -10,7 +11,7 @@
 - Tightened runtime documentation in `AGENTS.md` and `README.md`: pure-Python runtime paths are now explicitly declared reference-only, unsupported, and not maintained/tested.
 - Updated `README.md` to explicitly define the DLL-backed vendored C runtime as canonical for `legacy_cli`, and to mark pure-Python paths as migration/test fallback only.
 - Clarified `AGENTS.md` runtime contract: Python `legacy_cli` now relies on the ported DLL backend as canonical execution, while full pure-Python runtime parity is retired and only opt-in migration/test fallbacks remain.
-- Migrated runtime architecture to C-first execution by vendoring `mp3gain-1_5_2-src` into `src/c/legacy` and adding a stable shim API (`c_api_shim.c/.h`) for Python FFI integration.
+- Migrated runtime architecture to C-first execution by vendoring `mp3gain-1_5_2-src` into `src/c/legacy/mp3gain-1_5_2-src` and adding a stable shim API (`c_api_shim.c/.h`) for Python FFI integration.
 - Added deterministic MinGW build flow for runtime DLL generation:
   - Python build helper module: `src/mp3gain_gui_py/_c_backend/build.py`
   - build command script: `scripts/build_legacy_c_backend.py`

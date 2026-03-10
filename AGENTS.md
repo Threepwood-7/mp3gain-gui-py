@@ -7,7 +7,7 @@ Developer notes, implementation decisions, and validation procedures.
 ## Project overview
 
 PySide6 port of MP3Gain (Glen Sawyer / David Robinson) with a vendored C runtime backend.
-Uses editable legacy C sources (`src/c/legacy`) plus Python orchestration for the GUI/CLI surface.
+Uses editable legacy C sources (`src/c/legacy/mp3gain-1_5_2-src`) plus Python orchestration for the GUI/CLI surface.
 Target feature parity: VB6 GUI v1.2.5.
 
 - **Package:** `mp3gain_gui_py`
@@ -20,7 +20,7 @@ Target feature parity: VB6 GUI v1.2.5.
 ## Legacy CLI runtime policy
 
 - `src/mp3gain_gui_py/legacy_cli.py` is C-library-backed by default via `src/mp3gain_gui_py/_c_backend`.
-- The authoritative runtime C sources are vendored under `src/c/legacy` and built with MinGW.
+- The authoritative runtime C sources are vendored under `src/c/legacy/mp3gain-1_5_2-src` and built with MinGW.
 - Python runtime orchestration must call the DLL shim for analyze/apply/undo/tag operations.
 - The pure-Python runtime implementation is reference-only, and is not maintained or tested.
 - There is no supported Python runtime fallback path; C backend initialization failure is fatal for runtime execution.

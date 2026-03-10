@@ -12,7 +12,7 @@ def repo_root() -> Path:
 
 
 def legacy_source_dir() -> Path:
-    return repo_root() / "src" / "c" / "legacy"
+    return repo_root() / "src" / "c" / "legacy" / "mp3gain-1_5_2-src"
 
 
 def backend_bin_dir() -> Path:

@@ -170,7 +170,7 @@ Behavior notes:
 - `/r` and `/a`: if both are present, the last one wins.
 - `/g` and `/l` are direct apply modes (bypass normal analysis/recommend flow).
 - Legacy MP3 global gain math is step-based, so exact dB targets can round to nearest step.
-- `legacy_cli` runtime execution is DLL-backed from vendored C sources (`src/c/legacy` + `src/mp3gain_gui_py/_c_backend`).
+- `legacy_cli` runtime execution is DLL-backed from vendored C sources (`src/c/legacy/mp3gain-1_5_2-src` + `src/mp3gain_gui_py/_c_backend`).
 - Pure-Python runtime code is reference-only and is not maintained or tested.
 - There is no supported Python runtime fallback path; if DLL backend initialization fails, runtime commands fail.
 - Local `mp3gain.exe` remains oracle-only for parity/benchmark scripts and must not be used as runtime backend.
