@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -19,8 +20,19 @@ def backend_bin_dir() -> Path:
     return Path(__file__).resolve().parent / "bin"
 
 
+def backend_version_suffix() -> str | None:
+    source_dir_name = legacy_source_dir().name
+    match = re.fullmatch(r"mp3gain-([0-9_]+)-src", source_dir_name)
+    if match is None:
+        return None
+    return match.group(1)
+
+
 def backend_dll_path() -> Path:
-    return backend_bin_dir() / "mp3gain_legacy_backend.dll"
+    version_suffix = backend_version_suffix()
+    if version_suffix is None:
+        return backend_bin_dir() / "mp3gain_legacy_backend.dll"
+    return backend_bin_dir() / f"mp3gain_legacy_backend-{version_suffix}.dll"
 
 
 def _source_files() -> list[Path]:
