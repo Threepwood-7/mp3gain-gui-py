@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .._tags.writer import delete_tags
+from .._legacy_exact.processor import LegacyExactProcessor
 from .types import FileResult, WorkerRequest, WorkerResult
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from .worker_bridge import WorkerBridge
 
 
@@ -18,6 +19,7 @@ class TagWorker:
     def __init__(self, request: WorkerRequest, bridge: WorkerBridge) -> None:
         self._request = request
         self._bridge = bridge
+        self._processor = LegacyExactProcessor()
 
     def run(self) -> None:
         req = self._request
@@ -53,7 +55,9 @@ class TagWorker:
 
     def _process_file(self, path: Path) -> FileResult:
         try:
-            delete_tags(path)
+            result = self._processor.delete_mp3gain_tags(path)
+            if result.exit_code != 0:
+                return FileResult(path=path, ok=False, error_msg=result.message)
         except Exception as exc:
             return FileResult(path=path, ok=False, error_msg=str(exc))
         return FileResult(path=path, ok=True)

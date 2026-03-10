@@ -7,12 +7,19 @@ Legacy Pointers:
 
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from .._c_backend import (
+    CBackendError,
+    CBackendPathError,
+    CBackendUnavailable,
+    get_backend,
+)
 from .._engine.pcm_reader import decode_to_stereo_chunks, read_mp3_info
 from .._engine.replaygain import GainAnalyzer
 from .._mp3.file_info import scan_file, scan_max_amplitude
@@ -54,6 +61,21 @@ class LegacyCommandResult:
 class LegacyExactProcessor:
     """Single source of truth for legacy-compatible analyze/apply operations."""
 
+    def __init__(self) -> None:
+        self._backend = None
+        self._backend_error = ""
+        if os.environ.get("MP3GAIN_GUI_PY_DISABLE_C_BACKEND", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }:
+            return
+        try:
+            self._backend = get_backend(auto_build=True)
+        except CBackendUnavailable as exc:
+            self._backend = None
+            self._backend_error = str(exc)
+
     def analyze_track_gain_db(self, path: Path) -> float:
         gain_db, _used_ascii_alias = self.analyze_track_gain_db_with_fallback(path)
         return gain_db
@@ -80,6 +102,11 @@ class LegacyExactProcessor:
         return gain_db
 
     def _analyze_track_gain_and_peak_impl(self, path: Path) -> tuple[float, float]:
+        if self._backend is not None:
+            try:
+                return self._backend.analyze_track_gain_and_peak(path)
+            except (CBackendPathError, CBackendError):
+                pass
         sample_rate, _channels = read_mp3_info(path)
         analyzer = GainAnalyzer(sample_rate)
         max_amp = 0.0
@@ -212,6 +239,21 @@ class LegacyExactProcessor:
         if left_steps == 0 and right == 0:
             return LegacyCommandResult(exit_code=0, changed=False)
 
+        if self._backend is not None:
+            try:
+                self._backend.apply_gain_file(
+                    path,
+                    left_gain_steps=left_steps,
+                    right_gain_steps=right,
+                    wrap_gain=options.wrap_gain,
+                    preserve_timestamp=options.preserve_timestamp,
+                    use_temp_file=options.use_temp_file,
+                )
+                return LegacyCommandResult(exit_code=0, changed=True)
+            except (CBackendPathError, CBackendError):
+                # Narrow compatibility fallback for unsupported path/toolchain cases.
+                pass
+
         apply_gain_change(
             path,
             left_steps,
@@ -286,6 +328,17 @@ class LegacyExactProcessor:
         *,
         tag_format: Literal["apev2", "id3"] | None = None,
     ) -> LegacyCommandResult:
+        if self._backend is not None:
+            try:
+                self._backend.delete_tags(
+                    path,
+                    tag_format=tag_format,
+                    preserve_timestamp=False,
+                )
+                return LegacyCommandResult(exit_code=0, changed=True)
+            except (CBackendPathError, CBackendError):
+                pass
+
         if tag_format is None:
             delete_tags(path)
         else:
@@ -309,24 +362,32 @@ class LegacyExactProcessor:
         album_max_gain: int | None = None,
         tag_format: Literal["apev2", "id3"] = "apev2",
     ) -> None:
-        write_tags(
-            path,
-            TagData(
-                tag_format=tag_format,
-                track_gain_db=track_gain_db,
-                track_peak=track_peak,
-                album_gain_db=album_gain_db,
-                album_peak=album_peak,
-                undo_left=undo_left,
-                undo_right=undo_right,
-                undo_mode=undo_mode,
-                min_gain=min_gain,
-                max_gain=max_gain,
-                album_min_gain=album_min_gain,
-                album_max_gain=album_max_gain,
-            ),
+        payload = TagData(
             tag_format=tag_format,
+            track_gain_db=track_gain_db,
+            track_peak=track_peak,
+            album_gain_db=album_gain_db,
+            album_peak=album_peak,
+            undo_left=undo_left,
+            undo_right=undo_right,
+            undo_mode=undo_mode,
+            min_gain=min_gain,
+            max_gain=max_gain,
+            album_min_gain=album_min_gain,
+            album_max_gain=album_max_gain,
         )
+        if self._backend is not None:
+            try:
+                self._backend.write_tags(
+                    path,
+                    payload,
+                    tag_format=tag_format,
+                    preserve_timestamp=False,
+                )
+                return
+            except (CBackendPathError, CBackendError):
+                pass
+        write_tags(path, payload, tag_format=tag_format)
 
     def _read_first_audio_header(self, path: Path) -> FrameHeader | None:
         data = path.read_bytes()

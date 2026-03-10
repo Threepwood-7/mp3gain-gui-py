@@ -1,6 +1,16 @@
 # Changelog
 
 ## 2026-03-10
+- Migrated runtime architecture to C-first execution by vendoring `mp3gain-1_5_2-src` into `src/c/legacy` and adding a stable shim API (`c_api_shim.c/.h`) for Python FFI integration.
+- Added deterministic MinGW build flow for runtime DLL generation:
+  - Python build helper module: `src/mp3gain_gui_py/_c_backend/build.py`
+  - build command script: `scripts/build_legacy_c_backend.py`
+  - hatch shortcut: `hatch run build-c-backend`
+- Added ctypes runtime wrapper package `src/mp3gain_gui_py/_c_backend/` with serialized DLL access, structured error propagation, and operations for analysis/apply/tag read-write-delete.
+- Switched `LegacyExactProcessor` to call the C backend first for analysis, gain application, and tag mutation paths, with narrow fallback to Python implementation for compatibility edge cases.
+- Added CI Windows lane `c-backend-smoke` to build and load-test the C backend DLL before Python test execution.
+- Added unit smoke coverage for C backend loading and error-path behavior (`tests/unit/test_c_backend_smoke.py`).
+- Updated runtime policy docs in `AGENTS.md` and usage docs in `README.md` to reflect C-library-backed `legacy_cli` execution and MinGW prerequisite.
 - Added `PERF.md` with detailed C-vs-Python parity/performance findings and exact reproducible test instructions, plus a reusable harness script at `scripts/perf/run_c_python_parity_perf.py`.
 - Sanitized `PERF.md` to remove personal MP3 source-path and filename references, replacing them with neutral placeholders.
 - Reduced legacy CLI runtime overhead by removing repeated `bytearray`->`bytes` copies in frame mutation loops and by collapsing duplicated decode passes via combined track/album metric analysis paths.

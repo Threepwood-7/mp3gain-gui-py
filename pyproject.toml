@@ -60,6 +60,7 @@ dependencies = [
 [tool.hatch.envs.default.scripts]
 test = "pytest {args:tests}"
 test-cov = "pytest --cov=src/mp3gain_gui_py --cov-report=term-missing --cov-report=xml {args:tests}"
+build-c-backend = "python scripts/build_legacy_c_backend.py"
 
 [tool.hatch.envs.lint]
 dependencies = [

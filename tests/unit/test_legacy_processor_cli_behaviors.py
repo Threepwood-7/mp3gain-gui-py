@@ -1,9 +1,22 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from mp3gain_gui_py._legacy_exact.processor import LegacyCompatOptions, LegacyExactProcessor
+import pytest
+
+from mp3gain_gui_py._legacy_exact.processor import (
+    LegacyCompatOptions,
+    LegacyExactProcessor,
+)
 from mp3gain_gui_py._mp3.frame_parser import FrameHeader
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
+@pytest.fixture(autouse=True)
+def _disable_c_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MP3GAIN_GUI_PY_DISABLE_C_BACKEND", "1")
 
 
 def _frame_header(*, channel_mode: int, num_channels: int) -> FrameHeader:

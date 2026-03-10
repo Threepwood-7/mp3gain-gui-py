@@ -5,7 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from .._legacy_exact.math import db_to_legacy_steps
-from .._mp3.gain_writer import apply_gain_change, undo_gain_change
+from .._legacy_exact.processor import (
+    LegacyCompatOptions,
+    LegacyExactProcessor,
+)
 from .._tags.reader import read_tags
 from .types import FileResult, WorkerRequest, WorkerResult
 
@@ -24,6 +27,7 @@ class GainWorker:
     def __init__(self, request: WorkerRequest, bridge: WorkerBridge) -> None:
         self._request = request
         self._bridge = bridge
+        self._processor = LegacyExactProcessor()
 
     def run(self) -> None:
         req = self._request
@@ -59,24 +63,26 @@ class GainWorker:
 
     def _process_file(self, path: Path) -> FileResult:
         req = self._request
+        options = LegacyCompatOptions(
+            wrap_gain=req.wrap_gain,
+            preserve_timestamp=req.preserve_dates,
+            use_temp_file=True,
+        )
         try:
             if req.kind == "undo":
-                undo_tag = self._undo_tag_for(path)
-                undo_gain_change(
-                    path,
-                    undo_tag,
-                    wrap=req.wrap_gain,
-                    preserve_timestamp=req.preserve_dates,
-                )
+                result = self._processor.undo(path, options=options)
+                if result.exit_code != 0:
+                    return FileResult(path=path, ok=False, error_msg=result.message)
             else:
                 gain_db = self._gain_for(path)
                 steps = db_to_legacy_steps(gain_db)
-                apply_gain_change(
+                result = self._processor.apply_steps(
                     path,
-                    steps,
-                    wrap=req.wrap_gain,
-                    preserve_timestamp=req.preserve_dates,
+                    left_steps=steps,
+                    options=options,
                 )
+                if result.exit_code != 0:
+                    return FileResult(path=path, ok=False, error_msg=result.message)
         except Exception as exc:
             return FileResult(path=path, ok=False, error_msg=str(exc))
         return FileResult(path=path, ok=True)
@@ -96,9 +102,3 @@ class GainWorker:
                 return tag_data.track_gain_db
             return 0.0
         return 0.0
-
-    def _undo_tag_for(self, path: Path) -> str:
-        tag_data = read_tags(path)
-        if tag_data.has_undo:
-            return tag_data.undo_tag_value
-        raise ValueError(f"Missing MP3GAIN_UNDO tag in {path}")

@@ -55,9 +55,56 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  c-backend-smoke:
+    name: C Backend Smoke
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+
+      - name: Install Hatch
+        run: uv tool install hatch
+
+      - name: Ensure MinGW gcc is available
+        shell: pwsh
+        run: |
+          $gcc = Get-Command gcc -ErrorAction SilentlyContinue
+          if (-not $gcc) {
+            choco install mingw -y --no-progress
+            $candidates = @(
+              "C:\ProgramData\mingw64\mingw64\bin",
+              "C:\tools\mingw64\bin",
+              "C:\msys64\mingw64\bin"
+            )
+            foreach ($candidate in $candidates) {
+              if (Test-Path $candidate) {
+                Add-Content -Path $env:GITHUB_PATH -Value $candidate
+                $env:Path = "$candidate;$env:Path"
+                break
+              }
+            }
+          }
+          gcc --version
+
+      - name: Build C backend DLL
+        run: hatch run build-c-backend
+
+      - name: DLL load smoke test
+        run: hatch run python -c "import ctypes; from mp3gain_gui_py._c_backend.build import backend_dll_path; ctypes.CDLL(str(backend_dll_path())); print('c-backend-ok')"
+
   test:
     name: Test (Python ${{ matrix.python-version }})
     runs-on: windows-latest
+    needs: [lint, c-backend-smoke]
     strategy:
       fail-fast: false
       matrix:

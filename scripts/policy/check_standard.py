@@ -86,6 +86,7 @@ LEGACY_ROOT_CONFIG_PATTERNS = (
 CANONICAL_CONFIG_REQUIRED = ("config/app.defaults.toml", "config/app.example.toml")
 CANONICAL_CONFIG_LOCAL = "config/app.local.toml"
 REQUIRED_NAMING_RULE = "N"
+ALLOWED_NON_PACKAGE_SRC_DIRS = {"c"}
 REQUIRED_QT_NAMING_IGNORES = {
     "activateWindow",
     "closeEvent",
@@ -619,7 +620,6 @@ def collect_legacy_pointer_warnings(
     map_ids = set(pointer_map)
 
     code_ids: set[str] = set()
-    tracked_set = set(tracked)
     required_set = set(LEGACY_POINTER_REQUIRED_FILES)
 
     def _scan_file(rel: str) -> set[str]:
@@ -692,11 +692,16 @@ def main() -> int:
             ]
         )
 
-    if len(src_packages) != 1:
-        errors.append(f"Expected exactly one package directory under src/, found {len(src_packages)}.")
+    package_dirs = [p for p in src_packages if p.name not in ALLOWED_NON_PACKAGE_SRC_DIRS]
+
+    if len(package_dirs) != 1:
+        errors.append(
+            "Expected exactly one package directory under src/ (excluding allowed "
+            f"support dirs {sorted(ALLOWED_NON_PACKAGE_SRC_DIRS)}), found {len(package_dirs)}."
+        )
         package_name = ""
     else:
-        package_name = src_packages[0].name
+        package_name = package_dirs[0].name
         if not PACKAGE_NAME_RE.fullmatch(package_name):
             errors.append(
                 f"Package directory name must be snake_case under src/: {package_name}"

@@ -6,9 +6,7 @@ import math
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
-from .._engine.pcm_reader import decode_to_stereo_chunks, read_mp3_info
-from .._engine.replaygain import GainAnalyzer
-from .._mp3.file_info import scan_file, scan_max_amplitude
+from .._legacy_exact.processor import LegacyExactProcessor
 from .._tags.reader import read_tags
 from .types import FileResult, WorkerRequest, WorkerResult
 
@@ -28,6 +26,7 @@ class AnalyzeWorker:
     def __init__(self, request: WorkerRequest, bridge: WorkerBridge) -> None:
         self._request = request
         self._bridge = bridge
+        self._processor = LegacyExactProcessor()
 
     def run(self) -> None:
         req = self._request
@@ -77,64 +76,53 @@ class AnalyzeWorker:
             groups.setdefault(str(p.parent), []).append(p)
 
         # Per-group album accumulation
-        results_by_path: dict[Path, FileResult] = {}
         processed = 0
 
         for group_paths in groups.values():
-            # Determine common sample rate (first file wins; all should match)
-            sr = 44100
+            album_raw_db: float | None = None
             with suppress(Exception):
-                sr, _ = read_mp3_info(group_paths[0])
-
-            ga = GainAnalyzer(sr)
+                album_raw_db, _album_min_gain, _album_max_gain, _album_max_amp = (
+                    self._processor.analyze_album_metrics(
+                        group_paths,
+                        include_gain=not req.max_amp_only,
+                    )
+                )
 
             for path in group_paths:
                 if self._bridge.is_cancelled:
                     cancelled = True
                     break
                 self._bridge._relay_file_started(path)
-                result = self._analyze_track_with_ga(path, req.target_db, ga)
-                results_by_path[path] = result
-                processed += 1
-                self._bridge._relay_progress(processed, total)
-            if cancelled:
-                break
-
-            # Album gain available after all tracks in group
-            try:
-                album_raw_db = ga.get_album_gain()
-            except Exception:
-                album_raw_db = None  # type: ignore[assignment]
-
-            for path in group_paths:
-                r = results_by_path.get(path)
-                if r is None or not r.ok:
-                    continue
-                if album_raw_db is not None:
+                result = self._analyze_track(path, req.target_db)
+                if result.ok and album_raw_db is not None:
                     album_gain_db = album_raw_db
                     album_volume_db = req.target_db - album_raw_db
-                    max_amp = r.max_amplitude or 0.0
+                    max_amp = result.max_amplitude or 0.0
                     clip_album = max_amp * _db_to_linear(album_gain_db) if max_amp else None
-                    r = FileResult(
-                        path=r.path,
-                        ok=r.ok,
-                        error_msg=r.error_msg,
-                        volume_db=r.volume_db,
-                        track_gain_db=r.track_gain_db,
+                    result = FileResult(
+                        path=result.path,
+                        ok=result.ok,
+                        error_msg=result.error_msg,
+                        volume_db=result.volume_db,
+                        track_gain_db=result.track_gain_db,
                         album_gain_db=album_gain_db,
-                        max_amplitude=r.max_amplitude,
-                        min_gain_field=r.min_gain_field,
-                        max_gain_field=r.max_gain_field,
-                        clipping=r.clipping,
-                        clip_track=r.clip_track,
+                        max_amplitude=result.max_amplitude,
+                        min_gain_field=result.min_gain_field,
+                        max_gain_field=result.max_gain_field,
+                        clipping=result.clipping,
+                        clip_track=result.clip_track,
                         album_volume_db=album_volume_db,
                         clip_album=clip_album,
                     )
-                self._bridge._relay_file_done(r)
-                if r.ok:
+                processed += 1
+                if result.ok:
                     succeeded += 1
                 else:
                     failed += 1
+                self._bridge._relay_file_done(result)
+                self._bridge._relay_progress(processed, total)
+            if cancelled:
+                break
 
         self._bridge._relay_all_done(
             WorkerResult(
@@ -160,13 +148,30 @@ class AnalyzeWorker:
                 return tagged
 
         sr = 44100
+        del sr
         try:
-            sr, _ = read_mp3_info(path)
+            raw_db, max_amp, min_g, max_g = self._processor.analyze_track_metrics(
+                path,
+                include_gain=not self._request.max_amp_only,
+            )
+            track_gain_db = raw_db
+            volume_db = target_db - raw_db
+            clip_track = max_amp * _db_to_linear(track_gain_db) if max_amp else None
+            clipping = clip_track is not None and clip_track > 32767.0
         except Exception as exc:
             return FileResult(path=path, ok=False, error_msg=str(exc))
 
-        ga = GainAnalyzer(sr)
-        return self._analyze_track_with_ga(path, target_db, ga)
+        return FileResult(
+            path=path,
+            ok=True,
+            volume_db=volume_db,
+            track_gain_db=track_gain_db,
+            max_amplitude=max_amp,
+            min_gain_field=min_g,
+            max_gain_field=max_g,
+            clipping=clipping,
+            clip_track=clip_track,
+        )
 
     def _analyze_track_from_tags(
         self,
@@ -202,41 +207,6 @@ class AnalyzeWorker:
             clipping=clipping,
             clip_track=clip_track,
         )
-
-    def _analyze_track_with_ga(
-        self, path: Path, target_db: float, ga: GainAnalyzer
-    ) -> FileResult:
-        """Feed file into existing GainAnalyzer; return per-track result."""
-        try:
-            for _, left, right in decode_to_stereo_chunks(path):
-                ga.analyze_samples(left, right, len(left))
-
-            raw_db = ga.get_title_gain()
-            track_gain_db = raw_db
-            volume_db = target_db - raw_db
-
-            min_g, max_g = scan_file(path)
-            max_amp = scan_max_amplitude(path)
-
-            # Clipping after applying the recommended track gain.
-            clip_track = max_amp * _db_to_linear(track_gain_db) if max_amp else None
-            clipping = clip_track is not None and clip_track > 32767.0
-
-        except Exception as exc:
-            return FileResult(path=path, ok=False, error_msg=str(exc))
-
-        return FileResult(
-            path=path,
-            ok=True,
-            volume_db=volume_db,
-            track_gain_db=track_gain_db,
-            max_amplitude=max_amp,
-            min_gain_field=min_g,
-            max_gain_field=max_g,
-            clipping=clipping,
-            clip_track=clip_track,
-        )
-
 
 def _db_to_linear(db: float) -> float:
     return math.pow(10.0, db / 20.0)
