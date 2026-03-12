@@ -84,7 +84,9 @@ def _parse_args() -> Namespace:
         "--dst-dir",
         type=Path,
         default=None,
-        help="Optional destination directory. If omitted, files are normalized in place.",
+        help=(
+            "Optional destination directory. If omitted, files are normalized in place."
+        ),
     )
     parser.add_argument(
         "--jobs",
@@ -302,7 +304,8 @@ def _print_result(result: NormalizeResult) -> None:
 
     if result.error is not None:
         print(
-            f"[{result.index}/{result.total}] ERROR {result.target_file}: {result.error}",
+            f"[{result.index}/{result.total}] ERROR "
+            f"{result.target_file}: {result.error}",
             file=sys.stderr,
         )
         return
@@ -311,7 +314,9 @@ def _print_result(result: NormalizeResult) -> None:
     assert result.final_steps is not None
     print(
         f"[{result.index}/{result.total}] STEPS analyzed={result.analyzed_steps} "
-        f"offset_applied={result.final_steps - result.analyzed_steps} final={result.final_steps}"
+        "offset_applied="
+        f"{result.final_steps - result.analyzed_steps} "
+        f"final={result.final_steps}"
     )
 
     if result.apply_command is None:

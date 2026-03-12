@@ -81,7 +81,8 @@ def test_process_file_runs_analyze_then_apply_and_skips_zero(
         calls.append(command)
         if "/o" in command:
             stdout = (
-                "File\tMP3 gain\tdB gain\tMax Amplitude\tMax global_gain\tMin global_gain\n"
+                "File\tMP3 gain\tdB gain\tMax Amplitude\t"
+                "Max global_gain\tMin global_gain\n"
                 f"{target}\t0\t-0.180000\t12011.450678\t204\t76\n"
                 '"Album"\t0\t-0.180000\t12011.450678\t204\t76\n'
             )
@@ -155,7 +156,8 @@ def test_main_parallel_keeps_analyze_before_apply_per_file(
         if stage == "analyze":
             time.sleep(0.01)
             stdout = (
-                "File\tMP3 gain\tdB gain\tMax Amplitude\tMax global_gain\tMin global_gain\n"
+                "File\tMP3 gain\tdB gain\tMax Amplitude\t"
+                "Max global_gain\tMin global_gain\n"
                 f"{file_path}\t-2\t-2.810000\t23093.614593\t210\t78\n"
                 '"Album"\t-2\t-2.810000\t23093.614593\t210\t78\n'
             )

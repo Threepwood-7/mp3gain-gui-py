@@ -122,14 +122,9 @@ select = [
   "TCH",
   "RUF",
 ]
-external = ["C901"]
-ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*" = ["S101", "S105", "S106"]
-"src/mp3gain_gui_py/_mp3/gain_writer.py" = ["C901"]
-"src/mp3gain_gui_py/_workers/analyze_worker.py" = ["C901"]
-"src/mp3gain_gui_py/legacy_cli.py" = ["C901"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["mp3gain_gui_py"]
@@ -146,6 +141,7 @@ ignore-names = [
   "drawForeground",
   "drawInlineImage",
   "dropEvent",
+  "enterEvent",
   "eventFilter",
   "filePath",
   "filterAcceptsRow",
@@ -158,8 +154,10 @@ ignore-names = [
   "leaveEvent",
   "mouseDoubleClickEvent",
   "mouseMoveEvent",
+  "mousePressEvent",
   "mouseReleaseEvent",
   "moveEvent",
+  "nameFilterDisables",
   "nameFilters",
   "paintEvent",
   "rowCount",
@@ -194,7 +192,7 @@ indent-style = "space"
 docstring-code-format = true
 
 [tool.deptry]
-known_first_party = ["mp3gain_gui_py", "_common", "parity_common"]
+known_first_party = ["mp3gain_gui_py", "_common"]
 
 [tool.basedpyright]
 pythonVersion = "3.13"

@@ -241,7 +241,10 @@ def _parse_args() -> Namespace:
         "--jobs",
         type=int,
         default=default_parity_jobs(),
-        help="Parallel worker count for per-file parity build (default: 4 or MP3GAIN_PARITY_JOBS).",
+        help=(
+            "Parallel worker count for per-file parity build "
+            "(default: 4 or MP3GAIN_PARITY_JOBS)."
+        ),
     )
     parser.add_argument(
         "--force-rebuild",
@@ -347,7 +350,8 @@ def main() -> int:
         if result is not None:
             results.append(result)
             print(
-                f"{src.name}: steps={result['steps']} post_gain_db={result['post_gain_db']} "
+                f"{src.name}: steps={result['steps']} "
+                f"post_gain_db={result['post_gain_db']} "
                 f"skipped={result['skipped']}"
             )
             continue

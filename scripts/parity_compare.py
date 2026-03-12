@@ -403,7 +403,10 @@ def _parse_args() -> Namespace:
         "--original-dir",
         type=Path,
         default=ORIGINAL_DIR,
-        help="Directory containing original MP3 files (used for --mode full snapshot/build steps).",
+        help=(
+            "Directory containing original MP3 files "
+            "(used for --mode full snapshot/build steps)."
+        ),
     )
     parser.add_argument(
         "--reference-dir",
@@ -509,7 +512,8 @@ def _run_full_pipeline(
     build_rc = _run_step(build_cmd, cwd=repo_root, allow_failure=True)
     if build_rc != 0:
         print(
-            f"WARN parity build step returned {build_rc}; continuing to compare generated outputs."
+            f"WARN parity build step returned {build_rc}; "
+            "continuing to compare generated outputs."
         )
 
 

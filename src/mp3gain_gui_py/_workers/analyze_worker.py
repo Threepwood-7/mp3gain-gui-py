@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 import os
-from collections.abc import Iterable
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -13,6 +12,8 @@ from .process_tasks import album_group_gain_task, analyze_file_task
 from .types import FileResult, WorkerRequest, WorkerResult
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from .worker_bridge import WorkerBridge
 
 

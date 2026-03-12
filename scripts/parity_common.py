@@ -110,7 +110,8 @@ def run_mp3gain_table(
     result = subprocess.run(command, capture_output=True, text=True, check=False)
     if result.returncode != 0:
         raise RuntimeError(
-            f"mp3gain.exe failed with code {result.returncode}: {result.stderr or result.stdout}"
+            f"mp3gain.exe failed with code {result.returncode}: "
+            f"{result.stderr or result.stdout}"
         )
     return parse_mp3gain_output(result.stdout)
 

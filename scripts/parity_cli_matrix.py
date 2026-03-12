@@ -323,7 +323,8 @@ def _require_runtime_dependencies(repo_root: Path) -> None:
     if dep_check.returncode != 0:
         stderr = (dep_check.stderr or dep_check.stdout).strip()
         raise RuntimeError(
-            "Hatch runtime dependencies unavailable (expected miniaudio/mutagen/openpyxl). "
+            "Hatch runtime dependencies unavailable "
+            "(expected miniaudio/mutagen/openpyxl). "
             f"Details: {stderr}"
         )
 
@@ -701,15 +702,21 @@ def main() -> int:
                         "fail_count": fail_count,
                     },
                 )
+                eta_text = _eta_text(
+                    completed=completed,
+                    total=total_tasks,
+                    started=started,
+                )
                 print(
                     "Execution progress: "
                     f"{completed}/{total_tasks} pass={pass_count} fail={fail_count} "
-                    f"ETA={_eta_text(completed=completed, total=total_tasks, started=started)}"
+                    f"ETA={eta_text}"
                 )
                 if fail_count > 0 and fail_count % 5 == 0:
                     snapshot = failure_snapshots[-3:]
                     print(
-                        f"Failure snapshot ({fail_count} fails): {json.dumps(snapshot, sort_keys=True)}"
+                        f"Failure snapshot ({fail_count} fails): "
+                        f"{json.dumps(snapshot, sort_keys=True)}"
                     )
                     _write_progress_event(
                         progress_handle,

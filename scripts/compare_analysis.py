@@ -156,11 +156,15 @@ def main() -> None:
         if status != "OK":
             all_ok = False
 
-        print(
-            f"{fname:<12} {volume:>7.1f} {raw_db:>8.3f} {steps:>6d} {applied_db:>10.1f} "
-            f"{max_amp:>12.2f} {max_gain:>5d} {min_gain:>5d}  "
-            f"{delta_db:>+14.3f} {steps_match!s:>7} {max_gain_match!s:>6} {min_gain_match!s:>6}  {status}"
+        metrics_prefix = (
+            f"{fname:<12} {volume:>7.1f} {raw_db:>8.3f} {steps:>6d} {applied_db:>10.1f}"
         )
+        metrics_suffix = (
+            f"{max_amp:>12.2f} {max_gain:>5d} {min_gain:>5d}  "
+            f"{delta_db:>+14.3f} {steps_match!s:>7} "
+            f"{max_gain_match!s:>6} {min_gain_match!s:>6}  {status}"
+        )
+        print(f"{metrics_prefix} {metrics_suffix}")
 
     print()
     if all_ok:

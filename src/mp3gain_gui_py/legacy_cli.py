@@ -9,7 +9,7 @@ from __future__ import annotations
 import copy
 import math
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
@@ -56,6 +56,59 @@ class _LegacyCliArgs:
     info_mode: Literal["none", "version", "help", "help_qmark"]
     info_topic: str
     unrecognized_options: tuple[str, ...]
+
+
+@dataclass
+class _LegacyCliParseState:
+    quiet: bool = False
+    table_output: bool = False
+    stored_tag_policy: StoredTagPolicy = "auto"
+    delete_tags_requested: bool = False
+    apply_mode: ApplyMode = "none"
+    undo_requested: bool = False
+    wrap_gain: bool = False
+    auto_clip: bool = False
+    preserve_timestamp: bool = False
+    use_temp_file: bool = False
+    clip_confirmed: bool = False
+    force_apply: bool = False
+    max_amp_only: bool = False
+    track_only_analysis: bool = False
+    db_mod: float = 0.0
+    mp3_gain_mod: int = 0
+    direct_gain_steps: int | None = None
+    single_channel: _SingleChannelRequest | None = None
+    tag_format: Literal["apev2", "id3"] = "apev2"
+    info_mode: Literal["none", "version", "help", "help_qmark"] = "none"
+    info_topic: str = ""
+    unrecognized_options: list[str] = field(default_factory=list)
+
+
+@dataclass
+class _AlbumSummary:
+    enabled: bool
+    steps: int | None = None
+    db_gain: float | None = None
+    max_amp: float | None = None
+    min_gain: int | None = None
+    max_gain: int | None = None
+    tag_gain: float = 0.0
+    single_track_override: tuple[int, float, float, int, int] | None = None
+
+
+@dataclass
+class _PathTagState:
+    tags: TagData
+    original_tags: TagData
+    tag_dirty: bool = False
+
+
+@dataclass(frozen=True)
+class _TrackMetrics:
+    raw_gain: float
+    max_amp: float
+    min_gain: int
+    max_gain: int
 
 
 def _looks_like_switch(token: str) -> bool:
@@ -123,33 +176,160 @@ def _parse_single_channel_value(value: str) -> _SingleChannelRequest:
     )
 
 
+def _build_legacy_cli_args(
+    *,
+    paths: list[Path],
+    state: _LegacyCliParseState,
+) -> _LegacyCliArgs:
+    return _LegacyCliArgs(
+        files=tuple(paths),
+        quiet=state.quiet,
+        table_output=state.table_output,
+        stored_tag_policy=state.stored_tag_policy,
+        delete_tags_requested=state.delete_tags_requested,
+        apply_mode=state.apply_mode,
+        undo_requested=state.undo_requested,
+        wrap_gain=state.wrap_gain,
+        auto_clip=state.auto_clip,
+        preserve_timestamp=state.preserve_timestamp,
+        use_temp_file=state.use_temp_file,
+        clip_confirmed=state.clip_confirmed,
+        force_apply=state.force_apply,
+        max_amp_only=state.max_amp_only,
+        track_only_analysis=state.track_only_analysis,
+        db_mod=state.db_mod,
+        mp3_gain_mod=state.mp3_gain_mod,
+        direct_gain_steps=state.direct_gain_steps,
+        single_channel=state.single_channel,
+        tag_format=state.tag_format,
+        info_mode=state.info_mode,
+        info_topic=state.info_topic,
+        unrecognized_options=tuple(state.unrecognized_options),
+    )
+
+
+def _apply_info_switch(
+    *,
+    tokens: list[str],
+    index: int,
+    switch: str,
+    attached: str,
+    state: _LegacyCliParseState,
+) -> int:
+    if switch == "?":
+        state.info_mode = "help_qmark"
+        if attached:
+            state.info_topic = attached.strip()
+            return index
+        if index + 1 < len(tokens) and not _looks_like_switch(tokens[index + 1]):
+            state.info_topic = tokens[index + 1].strip()
+            return index + 1
+        return index
+    if switch == "h":
+        state.info_mode = "help"
+        if attached:
+            state.info_topic = attached.strip()
+        return index
+
+    state.info_mode = "version"
+    return index
+
+
+def _apply_flag_switch(
+    *,
+    switch: str,
+    token: str,
+    state: _LegacyCliParseState,
+) -> bool:
+    if switch == "q":
+        state.quiet = True
+    elif switch == "o":
+        state.table_output = True
+    elif switch == "r":
+        state.apply_mode = "track"
+    elif switch == "a":
+        state.apply_mode = "album"
+    elif switch == "u":
+        state.undo_requested = True
+    elif switch == "w":
+        state.wrap_gain = True
+    elif switch == "k":
+        state.auto_clip = True
+    elif switch == "p":
+        state.preserve_timestamp = True
+    elif switch == "t":
+        state.use_temp_file = True
+    elif switch == "c":
+        state.clip_confirmed = True
+    elif switch == "f":
+        state.force_apply = True
+    elif switch == "x":
+        state.max_amp_only = True
+    elif switch == "e":
+        state.unrecognized_options.append(token)
+    else:
+        return False
+    return True
+
+
+def _apply_value_switch(
+    *,
+    tokens: list[str],
+    index: int,
+    switch: str,
+    attached: str,
+    state: _LegacyCliParseState,
+) -> int | None:
+    if switch == "d":
+        value, index = _consume_value(tokens, index, attached, switch="/d")
+        state.db_mod = _parse_float(value, switch="/d")
+        return index
+    if switch == "m":
+        value, index = _consume_value(tokens, index, attached, switch="/m")
+        state.mp3_gain_mod = _parse_int(value, switch="/m")
+        return index
+    if switch == "g":
+        value, index = _consume_value(tokens, index, attached, switch="/g")
+        state.direct_gain_steps = _parse_int(value, switch="/g")
+        return index
+    if switch != "s":
+        return None
+
+    value, index = _consume_value(tokens, index, attached, switch="/s")
+    (
+        state.stored_tag_policy,
+        state.delete_tags_requested,
+        state.tag_format,
+    ) = _parse_scan_code(
+        value,
+        current_policy=state.stored_tag_policy,
+        delete_tags_requested=state.delete_tags_requested,
+        tag_format=state.tag_format,
+    )
+    return index
+
+
+def _parse_single_channel_switch(
+    *,
+    tokens: list[str],
+    index: int,
+    attached: str,
+) -> tuple[_SingleChannelRequest, int]:
+    if attached:
+        return _parse_single_channel_value(attached), index
+    if index + 2 >= len(tokens):
+        raise ValueError("Missing '/l <channel> <steps>' arguments")
+    channel = _parse_int(tokens[index + 1], switch="/l")
+    steps = _parse_int(tokens[index + 2], switch="/l")
+    return _SingleChannelRequest(channel_index=channel, steps=steps), index + 2
+
+
 def _parse_legacy_args(
     argv: list[str] | None,
 ) -> _LegacyCliArgs:
     tokens = list(sys.argv[1:] if argv is None else argv)
     paths: list[Path] = []
-    quiet = False
-    table_output = False
-    stored_tag_policy: StoredTagPolicy = "auto"
-    delete_tags_requested = False
-    apply_mode: ApplyMode = "none"
-    undo_requested = False
-    wrap_gain = False
-    auto_clip = False
-    preserve_timestamp = False
-    use_temp_file = False
-    clip_confirmed = False
-    force_apply = False
-    max_amp_only = False
-    track_only_analysis = False
-    db_mod = 0.0
-    mp3_gain_mod = 0
-    direct_gain_steps: int | None = None
-    single_channel: _SingleChannelRequest | None = None
-    tag_format: Literal["apev2", "id3"] = "apev2"
-    info_mode: Literal["none", "version", "help", "help_qmark"] = "none"
-    info_topic = ""
-    unrecognized_options: list[str] = []
+    state = _LegacyCliParseState()
 
     i = 0
     while i < len(tokens):
@@ -165,104 +345,610 @@ def _parse_legacy_args(
         switch = token[1:2].lower()
         attached = token[2:]
 
-        if switch == "?":
-            info_mode = "help_qmark"
-            if attached:
-                info_topic = attached.strip()
-            elif i + 1 < len(tokens) and not _looks_like_switch(tokens[i + 1]):
-                info_topic = tokens[i + 1].strip()
-                i += 1
-        elif switch == "h":
-            info_mode = "help"
-            if attached:
-                info_topic = attached.strip()
-        elif switch == "v":
-            info_mode = "version"
-        elif switch == "q":
-            quiet = True
-        elif switch == "o":
-            table_output = True
-        elif switch == "r":
-            apply_mode = "track"
-        elif switch == "a":
-            apply_mode = "album"
-        elif switch == "u":
-            undo_requested = True
-        elif switch == "w":
-            wrap_gain = True
-        elif switch == "k":
-            auto_clip = True
-        elif switch == "p":
-            preserve_timestamp = True
-        elif switch == "t":
-            use_temp_file = True
-        elif switch == "c":
-            clip_confirmed = True
-        elif switch == "f":
-            force_apply = True
-        elif switch == "x":
-            max_amp_only = True
-        elif switch == "e":
-            # Legacy mp3gain.exe 1.4.6 treats /e as unrecognized.
-            unrecognized_options.append(token)
-        elif switch == "d":
-            value, i = _consume_value(tokens, i, attached, switch="/d")
-            db_mod = _parse_float(value, switch="/d")
-        elif switch == "m":
-            value, i = _consume_value(tokens, i, attached, switch="/m")
-            mp3_gain_mod = _parse_int(value, switch="/m")
-        elif switch == "g":
-            value, i = _consume_value(tokens, i, attached, switch="/g")
-            direct_gain_steps = _parse_int(value, switch="/g")
+        if switch in {"?", "h", "v"}:
+            i = _apply_info_switch(
+                tokens=tokens,
+                index=i,
+                switch=switch,
+                attached=attached,
+                state=state,
+            )
+        elif _apply_flag_switch(switch=switch, token=token, state=state):
+            pass
         elif switch == "l":
-            if attached:
-                single_channel = _parse_single_channel_value(attached)
-            else:
-                if i + 2 >= len(tokens):
-                    raise ValueError("Missing '/l <channel> <steps>' arguments")
-                channel = _parse_int(tokens[i + 1], switch="/l")
-                steps = _parse_int(tokens[i + 2], switch="/l")
-                single_channel = _SingleChannelRequest(
-                    channel_index=channel, steps=steps
-                )
-                i += 2
-        elif switch == "s":
-            value, i = _consume_value(tokens, i, attached, switch="/s")
-            stored_tag_policy, delete_tags_requested, tag_format = _parse_scan_code(
-                value,
-                current_policy=stored_tag_policy,
-                delete_tags_requested=delete_tags_requested,
-                tag_format=tag_format,
+            state.single_channel, i = _parse_single_channel_switch(
+                tokens=tokens,
+                index=i,
+                attached=attached,
             )
         else:
-            raise ValueError(f"Unsupported switch: {token}")
+            updated_index = _apply_value_switch(
+                tokens=tokens,
+                index=i,
+                switch=switch,
+                attached=attached,
+                state=state,
+            )
+            if updated_index is None:
+                raise ValueError(f"Unsupported switch: {token}")
+            i = updated_index
 
         i += 1
 
-    return _LegacyCliArgs(
-        files=tuple(paths),
-        quiet=quiet,
-        table_output=table_output,
-        stored_tag_policy=stored_tag_policy,
-        delete_tags_requested=delete_tags_requested,
-        apply_mode=apply_mode,
-        undo_requested=undo_requested,
-        wrap_gain=wrap_gain,
-        auto_clip=auto_clip,
-        preserve_timestamp=preserve_timestamp,
-        use_temp_file=use_temp_file,
-        clip_confirmed=clip_confirmed,
-        force_apply=force_apply,
-        max_amp_only=max_amp_only,
-        track_only_analysis=track_only_analysis,
-        db_mod=db_mod,
-        mp3_gain_mod=mp3_gain_mod,
-        direct_gain_steps=direct_gain_steps,
-        single_channel=single_channel,
-        tag_format=tag_format,
-        info_mode=info_mode,
-        info_topic=info_topic,
-        unrecognized_options=tuple(unrecognized_options),
+    return _build_legacy_cli_args(paths=paths, state=state)
+
+
+def _print_table_header(args: _LegacyCliArgs) -> None:
+    if not args.table_output:
+        return
+    if args.stored_tag_policy == "check_only":
+        print(
+            "File\tMP3 gain\tdB gain\tMax Amplitude\tMax global_gain\tMin global_gain\t"
+            "Album gain\tAlbum dB gain\tAlbum Max Amplitude\tAlbum Max global_gain\t"
+            "Album Min global_gain"
+        )
+        return
+    if args.undo_requested:
+        print("File\tleft global_gain change\tright global_gain change")
+        return
+    print("File\tMP3 gain\tdB gain\tMax Amplitude\tMax global_gain\tMin global_gain")
+
+
+def _init_processor() -> LegacyExactProcessor:
+    try:
+        return LegacyExactProcessor()
+    except Exception as exc:  # pragma: no cover - defensive for CLI surface
+        raise RuntimeError(f"failed to initialize C backend: {exc}") from exc
+
+
+def _handle_info_request(args: _LegacyCliArgs) -> int | None:
+    for option in args.unrecognized_options:
+        print(f"I don't recognize option {option}", file=sys.stderr)
+
+    if args.info_mode == "none":
+        return None
+
+    _print_info(args.info_mode, args.info_topic)
+    if args.files:
+        return None
+    if args.info_mode == "help_qmark":
+        return 1 if not args.info_topic else 0
+    return 0
+
+
+def _album_summary_enabled(args: _LegacyCliArgs, existing_paths: list[Path]) -> bool:
+    return bool(existing_paths) and all(
+        (
+            args.apply_mode != "track",
+            not args.track_only_analysis,
+            args.stored_tag_policy != "check_only",
+            not args.undo_requested,
+            args.single_channel is None,
+            args.direct_gain_steps is None,
+            not args.delete_tags_requested,
+        )
+    )
+
+
+def _resolve_single_track_album_summary(
+    args: _LegacyCliArgs,
+    *,
+    processor: LegacyExactProcessor,
+    existing_paths: list[Path],
+) -> TagData | None:
+    if (
+        len(existing_paths) != 1
+        or args.stored_tag_policy != "auto"
+        or args.stored_tag_policy == "recalc"
+    ):
+        return None
+    candidate = _load_runtime_tags(
+        processor, existing_paths[0], tag_format=args.tag_format
+    )
+    if (
+        candidate.track_gain_db is None
+        or candidate.track_peak is None
+        or candidate.min_gain is None
+        or candidate.max_gain is None
+    ):
+        return None
+    return candidate
+
+
+def _resolve_album_metrics_from_processor(
+    args: _LegacyCliArgs,
+    *,
+    processor: LegacyExactProcessor,
+    existing_paths: list[Path],
+) -> tuple[float, int, int, float]:
+    if hasattr(processor, "analyze_album_metrics"):
+        return processor.analyze_album_metrics(
+            existing_paths,
+            include_gain=not args.max_amp_only,
+        )
+    album_tag_gain = (
+        0.0 if args.max_amp_only else processor.analyze_album_gain_db(existing_paths)
+    )
+    album_min_gain, album_max_gain = processor.analyze_album_minmax_gain(existing_paths)
+    album_max_amp = max(
+        (processor.analyze_max_amplitude(path) for path in existing_paths),
+        default=0.0,
+    )
+    return album_tag_gain, album_min_gain, album_max_gain, album_max_amp
+
+
+def _prepare_album_summary(
+    args: _LegacyCliArgs,
+    *,
+    processor: LegacyExactProcessor,
+    existing_paths: list[Path],
+) -> _AlbumSummary:
+    summary = _AlbumSummary(enabled=_album_summary_enabled(args, existing_paths))
+    if not summary.enabled:
+        return summary
+
+    single_existing = _resolve_single_track_album_summary(
+        args,
+        processor=processor,
+        existing_paths=existing_paths,
+    )
+    if single_existing is not None:
+        summary.tag_gain = (
+            single_existing.album_gain_db
+            if single_existing.album_gain_db is not None
+            else single_existing.track_gain_db or 0.0
+        )
+        summary.max_amp = (
+            single_existing.track_peak
+            if single_existing.track_peak is not None
+            else single_existing.album_peak
+        ) * 32768.0
+        summary.min_gain = (
+            single_existing.min_gain
+            if single_existing.min_gain is not None
+            else single_existing.album_min_gain
+        )
+        summary.max_gain = (
+            single_existing.max_gain
+            if single_existing.max_gain is not None
+            else single_existing.album_max_gain
+        )
+    else:
+        (
+            summary.tag_gain,
+            summary.min_gain,
+            summary.max_gain,
+            summary.max_amp,
+        ) = _resolve_album_metrics_from_processor(
+            args,
+            processor=processor,
+            existing_paths=existing_paths,
+        )
+
+    summary.db_gain = summary.tag_gain + args.db_mod
+    summary.steps = db_to_legacy_steps(summary.db_gain, mp3_gain_mod=args.mp3_gain_mod)
+    if (
+        args.apply_mode == "album"
+        and args.auto_clip
+        and summary.steps is not None
+        and summary.max_amp is not None
+    ):
+        max_no_clip = _max_no_clip_steps(summary.max_amp)
+        if max_no_clip is not None and summary.steps > max_no_clip:
+            summary.steps = max_no_clip
+    return summary
+
+
+def _build_path_tag_state(
+    args: _LegacyCliArgs,
+    *,
+    processor: LegacyExactProcessor,
+    path: Path,
+    skip_tag_updates: bool,
+) -> _PathTagState:
+    loaded_tags = _load_runtime_tags(processor, path, tag_format=args.tag_format)
+    tags = loaded_tags if not skip_tag_updates else TagData()
+    tag_state = _PathTagState(
+        tags=tags,
+        original_tags=copy.deepcopy(loaded_tags),
+    )
+    if args.stored_tag_policy == "recalc" and not skip_tag_updates:
+        tag_state.tag_dirty = _clear_recalc_fields(tags)
+    return tag_state
+
+
+def _write_tags_if_needed(
+    args: _LegacyCliArgs,
+    *,
+    processor: LegacyExactProcessor,
+    path: Path,
+    tag_state: _PathTagState,
+    skip_tag_updates: bool,
+) -> None:
+    if skip_tag_updates or not tag_state.tag_dirty:
+        return
+    _write_runtime_tags(
+        processor,
+        path,
+        tag_state.tags,
+        tag_format=args.tag_format,
+        preserve_timestamp=args.preserve_timestamp,
+    )
+
+
+def _single_channel_gain_changes(request: _SingleChannelRequest) -> tuple[int, int]:
+    left = request.steps if request.channel_index == 0 else 0
+    right = request.steps if request.channel_index == 1 else 0
+    return left, right
+
+
+def _handle_check_only_path(
+    args: _LegacyCliArgs,
+    *,
+    processor: LegacyExactProcessor,
+    path: Path,
+) -> bool:
+    if args.stored_tag_policy != "check_only":
+        return False
+    tags = _load_runtime_tags(processor, path, tag_format=args.tag_format)
+    if args.table_output:
+        print(_format_check_only_table_line(path, tags))
+    elif not args.quiet and tags.track_gain_db is not None:
+        steps = db_to_legacy_steps(tags.track_gain_db, mp3_gain_mod=0)
+        print(
+            f'Recommended "Track" dB change: {tags.track_gain_db:.6f}\n'
+            f'Recommended "Track" mp3 gain change: {steps}\n'
+            f"Applied step dB (exact): {legacy_steps_to_db_exact(steps):.6f}"
+        )
+    return True
+
+
+def _handle_undo_request(
+    args: _LegacyCliArgs,
+    *,
+    processor: LegacyExactProcessor,
+    path: Path,
+    options: LegacyCompatOptions,
+    tag_state: _PathTagState,
+) -> int | None:
+    if not args.undo_requested:
+        return None
+    undo_left = tag_state.tags.undo_left
+    undo_right = tag_state.tags.undo_right
+    if undo_left is not None and undo_right is not None and (undo_left or undo_right):
+        result = processor.apply_steps(
+            path,
+            left_steps=undo_left,
+            right_steps=undo_right,
+            options=options,
+        )
+        if result.exit_code != 0:
+            if not args.quiet:
+                print(f"{path}\tERROR\t{result.message}")
+            return 1
+        _apply_gain_and_update_tags(
+            tag_state.tags,
+            left_gain_change=undo_left,
+            right_gain_change=undo_right,
+            wrap_gain=args.wrap_gain,
+        )
+        _write_runtime_tags(
+            processor,
+            path,
+            tag_state.tags,
+            tag_format=args.tag_format,
+            preserve_timestamp=args.preserve_timestamp,
+        )
+        return 0
+
+    if args.table_output:
+        print(f"{path}\t0\t0")
+    elif not args.quiet:
+        if tag_state.tags.has_undo:
+            print(f"No changes to undo in {path}", file=sys.stderr)
+        else:
+            print(f"No undo information in {path}", file=sys.stderr)
+    return 0
+
+
+def _handle_single_channel_request(
+    args: _LegacyCliArgs,
+    *,
+    processor: LegacyExactProcessor,
+    path: Path,
+    options: LegacyCompatOptions,
+    tag_state: _PathTagState,
+    skip_tag_updates: bool,
+) -> int | None:
+    if args.single_channel is None:
+        return None
+    result = processor.apply_single_channel_steps(
+        path,
+        channel_index=args.single_channel.channel_index,
+        steps=args.single_channel.steps,
+        options=options,
+    )
+    left, right = _single_channel_gain_changes(args.single_channel)
+    if result.exit_code != 0:
+        if not skip_tag_updates:
+            _apply_gain_and_update_tags(
+                tag_state.tags,
+                left_gain_change=left,
+                right_gain_change=right,
+                wrap_gain=args.wrap_gain,
+            )
+            _write_runtime_tags(
+                processor,
+                path,
+                tag_state.tags,
+                tag_format=args.tag_format,
+                preserve_timestamp=args.preserve_timestamp,
+            )
+        if not args.quiet:
+            print(f"{path}: {result.message}")
+        return 1
+
+    if not skip_tag_updates and args.single_channel.steps != 0:
+        _apply_gain_and_update_tags(
+            tag_state.tags,
+            left_gain_change=left,
+            right_gain_change=right,
+            wrap_gain=args.wrap_gain,
+        )
+        _write_runtime_tags(
+            processor,
+            path,
+            tag_state.tags,
+            tag_format=args.tag_format,
+            preserve_timestamp=args.preserve_timestamp,
+        )
+    return 0
+
+
+def _handle_direct_gain_request(
+    args: _LegacyCliArgs,
+    *,
+    processor: LegacyExactProcessor,
+    path: Path,
+    options: LegacyCompatOptions,
+    tag_state: _PathTagState,
+    skip_tag_updates: bool,
+) -> int | None:
+    if args.direct_gain_steps is None:
+        return None
+    result = processor.apply_direct_gain_steps(
+        path,
+        steps=args.direct_gain_steps,
+        options=options,
+    )
+    if result.exit_code != 0:
+        if not args.quiet:
+            print(f"{path}\tERROR\t{result.message}")
+        return 1
+    if not skip_tag_updates and args.direct_gain_steps != 0:
+        _apply_gain_and_update_tags(
+            tag_state.tags,
+            left_gain_change=args.direct_gain_steps,
+            right_gain_change=args.direct_gain_steps,
+            wrap_gain=args.wrap_gain,
+        )
+        _write_runtime_tags(
+            processor,
+            path,
+            tag_state.tags,
+            tag_format=args.tag_format,
+            preserve_timestamp=args.preserve_timestamp,
+        )
+    return 0
+
+
+def _handle_delete_tags_request(
+    args: _LegacyCliArgs,
+    *,
+    processor: LegacyExactProcessor,
+    path: Path,
+) -> int | None:
+    if not args.delete_tags_requested:
+        return None
+    result = processor.delete_mp3gain_tags(path, tag_format=args.tag_format)
+    if result.exit_code != 0:
+        if not args.quiet:
+            print(f"{path}\tERROR\t{result.message}")
+        return 1
+    return 0
+
+
+def _resolve_track_metrics(
+    args: _LegacyCliArgs,
+    *,
+    processor: LegacyExactProcessor,
+    path: Path,
+    tag_state: _PathTagState,
+    skip_tag_updates: bool,
+) -> _TrackMetrics:
+    tags = tag_state.tags
+    original_tags = tag_state.original_tags
+    used_auto_tags = (
+        args.stored_tag_policy == "auto"
+        and tags.tag_format != "none"
+        and tags.track_gain_db is not None
+        and tags.track_peak is not None
+        and tags.min_gain is not None
+        and tags.max_gain is not None
+        and args.stored_tag_policy != "recalc"
+    )
+    used_skip_fallback = (
+        args.stored_tag_policy == "skip"
+        and original_tags.track_gain_db is not None
+        and original_tags.track_peak is not None
+        and original_tags.min_gain is not None
+        and original_tags.max_gain is not None
+    )
+    if used_auto_tags or used_skip_fallback:
+        source_tags = tags if used_auto_tags else original_tags
+        return _TrackMetrics(
+            raw_gain=source_tags.track_gain_db or 0.0,
+            max_amp=(source_tags.track_peak or 0.0) * 32768.0,
+            min_gain=source_tags.min_gain or 0,
+            max_gain=source_tags.max_gain or 0,
+        )
+
+    if hasattr(processor, "analyze_track_metrics"):
+        raw_gain, max_amp, min_gain, max_gain = processor.analyze_track_metrics(
+            path,
+            include_gain=not args.max_amp_only,
+        )
+    else:
+        raw_gain = 0.0 if args.max_amp_only else processor.analyze_track_gain_db(path)
+        max_amp = processor.analyze_max_amplitude(path)
+        min_gain, max_gain = processor.analyze_minmax_gain(path)
+
+    if args.stored_tag_policy in {"recalc", "skip"}:
+        if (
+            original_tags.track_peak is not None
+            and abs(max_amp - (original_tags.track_peak * 32768.0)) >= 1.0
+        ):
+            max_amp = original_tags.track_peak * 32768.0
+        if (
+            original_tags.track_gain_db is not None
+            and abs(raw_gain - original_tags.track_gain_db) <= 0.1
+        ):
+            raw_gain = original_tags.track_gain_db
+
+    if not skip_tag_updates:
+        tag_state.tag_dirty = (
+            _update_track_tags_from_analysis(
+                tags,
+                raw_gain_db=raw_gain,
+                max_amp=max_amp,
+                min_gain=min_gain,
+                max_gain=max_gain,
+                max_amp_only=args.max_amp_only,
+            )
+            or tag_state.tag_dirty
+        )
+    return _TrackMetrics(
+        raw_gain=raw_gain,
+        max_amp=max_amp,
+        min_gain=min_gain,
+        max_gain=max_gain,
+    )
+
+
+def _resolve_applied_steps(
+    args: _LegacyCliArgs,
+    *,
+    steps: int,
+    max_amp: float,
+    album_summary: _AlbumSummary,
+) -> int | None:
+    applied_steps = album_summary.steps if args.apply_mode == "album" else steps
+    if applied_steps is None:
+        return None
+    if args.apply_mode == "track" and args.auto_clip:
+        max_no_clip = _max_no_clip_steps(max_amp)
+        if max_no_clip is not None and applied_steps > max_no_clip:
+            return max_no_clip
+    return applied_steps
+
+
+def _would_reject_for_clipping(
+    args: _LegacyCliArgs,
+    *,
+    max_amp: float,
+    applied_steps: int,
+) -> bool:
+    return (
+        args.apply_mode in {"track", "album"}
+        and not args.auto_clip
+        and not args.clip_confirmed
+        and _would_clip(max_amp, applied_steps)
+    )
+
+
+def _report_clipping_failure(
+    args: _LegacyCliArgs,
+    *,
+    processor: LegacyExactProcessor,
+    path: Path,
+    tag_state: _PathTagState,
+    skip_tag_updates: bool,
+) -> int:
+    if not args.quiet:
+        print(f"{path}\tERROR\tclipping risk; rerun with /c or /k")
+    _write_tags_if_needed(
+        args,
+        processor=processor,
+        path=path,
+        tag_state=tag_state,
+        skip_tag_updates=skip_tag_updates,
+    )
+    return 1
+
+
+def _emit_track_result(
+    args: _LegacyCliArgs,
+    *,
+    path: Path,
+    steps: int,
+    db_gain: float,
+    max_amp: float,
+    min_gain: int,
+    max_gain: int,
+) -> None:
+    if args.table_output:
+        print(
+            _format_table_line(
+                path,
+                steps=steps,
+                db_gain=db_gain,
+                max_amp=max_amp,
+                min_gain=min_gain,
+                max_gain=max_gain,
+            )
+        )
+        return
+    if not args.quiet and args.apply_mode == "none":
+        print(
+            f'Recommended "Track" dB change: {db_gain:.6f}\n'
+            f'Recommended "Track" mp3 gain change: {steps}\n'
+            f"Applied step dB (exact): {legacy_steps_to_db_exact(steps):.6f}"
+        )
+
+
+def _emit_album_summary(args: _LegacyCliArgs, summary: _AlbumSummary) -> None:
+    if (
+        not args.table_output
+        or not summary.enabled
+        or summary.steps is None
+        or summary.db_gain is None
+        or summary.max_amp is None
+        or args.apply_mode == "track"
+        or args.stored_tag_policy == "check_only"
+        or args.undo_requested
+        or args.single_channel is not None
+        or args.direct_gain_steps is not None
+        or args.delete_tags_requested
+    ):
+        return
+
+    if summary.single_track_override is not None:
+        (
+            summary.steps,
+            summary.db_gain,
+            summary.max_amp,
+            summary.min_gain,
+            summary.max_gain,
+        ) = summary.single_track_override
+    print(
+        _format_table_line(
+            '"Album"',
+            steps=summary.steps,
+            db_gain=summary.db_gain,
+            max_amp=summary.max_amp,
+            min_gain=summary.min_gain or 0,
+            max_gain=summary.max_gain or 0,
+        )
     )
 
 
@@ -571,6 +1257,178 @@ def _format_check_only_table_line(path: Path, tags: TagData) -> str:
     )
 
 
+def _process_standard_path(
+    args: _LegacyCliArgs,
+    *,
+    processor: LegacyExactProcessor,
+    path: Path,
+    options: LegacyCompatOptions,
+    skip_tag_updates: bool,
+    existing_paths: list[Path],
+    album_summary: _AlbumSummary,
+) -> int:
+    tag_state = _build_path_tag_state(
+        args,
+        processor=processor,
+        path=path,
+        skip_tag_updates=skip_tag_updates,
+    )
+
+    for handler in (
+        lambda: _handle_undo_request(
+            args,
+            processor=processor,
+            path=path,
+            options=options,
+            tag_state=tag_state,
+        ),
+        lambda: _handle_single_channel_request(
+            args,
+            processor=processor,
+            path=path,
+            options=options,
+            tag_state=tag_state,
+            skip_tag_updates=skip_tag_updates,
+        ),
+        lambda: _handle_direct_gain_request(
+            args,
+            processor=processor,
+            path=path,
+            options=options,
+            tag_state=tag_state,
+            skip_tag_updates=skip_tag_updates,
+        ),
+        lambda: _handle_delete_tags_request(
+            args,
+            processor=processor,
+            path=path,
+        ),
+    ):
+        outcome = handler()
+        if outcome is not None:
+            return outcome
+
+    metrics = _resolve_track_metrics(
+        args,
+        processor=processor,
+        path=path,
+        tag_state=tag_state,
+        skip_tag_updates=skip_tag_updates,
+    )
+    base_gain = (
+        tag_state.tags.track_gain_db
+        if (
+            args.max_amp_only
+            and args.stored_tag_policy == "auto"
+            and tag_state.tags.track_gain_db is not None
+        )
+        else metrics.raw_gain
+    )
+    db_gain = base_gain + args.db_mod
+    steps = db_to_legacy_steps(db_gain, mp3_gain_mod=args.mp3_gain_mod)
+
+    if (
+        album_summary.enabled
+        and album_summary.max_amp is not None
+        and album_summary.min_gain is not None
+        and album_summary.max_gain is not None
+        and (len(existing_paths) > 1 or args.apply_mode == "album")
+        and not skip_tag_updates
+    ):
+        tag_state.tag_dirty = (
+            _update_album_tags_from_analysis(
+                tag_state.tags,
+                album_gain_db=album_summary.tag_gain,
+                album_max_amp=album_summary.max_amp,
+                album_min_gain=album_summary.min_gain,
+                album_max_gain=album_summary.max_gain,
+                max_amp_only=args.max_amp_only,
+            )
+            or tag_state.tag_dirty
+        )
+
+    if len(existing_paths) == 1 and args.stored_tag_policy in {"skip", "recalc"}:
+        album_summary.single_track_override = (
+            steps,
+            db_gain,
+            metrics.max_amp,
+            metrics.min_gain,
+            metrics.max_gain,
+        )
+
+    applied_steps = _resolve_applied_steps(
+        args,
+        steps=steps,
+        max_amp=metrics.max_amp,
+        album_summary=album_summary,
+    )
+    if applied_steps is None:
+        _write_tags_if_needed(
+            args,
+            processor=processor,
+            path=path,
+            tag_state=tag_state,
+            skip_tag_updates=skip_tag_updates,
+        )
+        _emit_track_result(
+            args,
+            path=path,
+            steps=steps,
+            db_gain=db_gain,
+            max_amp=metrics.max_amp,
+            min_gain=metrics.min_gain,
+            max_gain=metrics.max_gain,
+        )
+        return 0
+
+    if _would_reject_for_clipping(
+        args, max_amp=metrics.max_amp, applied_steps=applied_steps
+    ):
+        return _report_clipping_failure(
+            args,
+            processor=processor,
+            path=path,
+            tag_state=tag_state,
+            skip_tag_updates=skip_tag_updates,
+        )
+
+    if args.apply_mode in {"track", "album"} and applied_steps != 0:
+        if not args.table_output:
+            print(path)
+            print(f"Applying mp3 gain change of {applied_steps} to {path}...")
+        result = processor.apply_steps(path, left_steps=applied_steps, options=options)
+        if result.exit_code != 0:
+            if not args.quiet:
+                print(f"{path}\tERROR\t{result.message}")
+            return 1
+        if not skip_tag_updates:
+            _apply_gain_and_update_tags(
+                tag_state.tags,
+                left_gain_change=applied_steps,
+                right_gain_change=applied_steps,
+                wrap_gain=args.wrap_gain,
+            )
+            tag_state.tag_dirty = True
+
+    _write_tags_if_needed(
+        args,
+        processor=processor,
+        path=path,
+        tag_state=tag_state,
+        skip_tag_updates=skip_tag_updates,
+    )
+    _emit_track_result(
+        args,
+        path=path,
+        steps=steps,
+        db_gain=db_gain,
+        max_amp=metrics.max_amp,
+        min_gain=metrics.min_gain,
+        max_gain=metrics.max_gain,
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run legacy-compatible CLI argument handling and file operations.
 
@@ -582,138 +1440,28 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    for option in args.unrecognized_options:
-        print(f"I don't recognize option {option}", file=sys.stderr)
-
-    if args.info_mode != "none":
-        _print_info(args.info_mode, args.info_topic)
-        if not args.files:
-            if args.info_mode == "help_qmark":
-                return 1 if not args.info_topic else 0
-            return 0
+    info_result = _handle_info_request(args)
+    if info_result is not None:
+        return info_result
 
     if not args.files:
         print("ERROR: no input files", file=sys.stderr)
         return 1
 
-    if args.table_output:
-        if args.stored_tag_policy == "check_only":
-            print(
-                "File\tMP3 gain\tdB gain\tMax Amplitude\tMax global_gain\tMin global_gain\t"
-                "Album gain\tAlbum dB gain\tAlbum Max Amplitude\tAlbum Max global_gain\t"
-                "Album Min global_gain"
-            )
-        elif args.undo_requested:
-            print("File\tleft global_gain change\tright global_gain change")
-        else:
-            print(
-                "File\tMP3 gain\tdB gain\tMax Amplitude\tMax global_gain\tMin global_gain"
-            )
-
+    _print_table_header(args)
     try:
-        processor = LegacyExactProcessor()
-    except Exception as exc:  # pragma: no cover - defensive for CLI surface
-        print(f"ERROR: failed to initialize C backend: {exc}", file=sys.stderr)
+        processor = _init_processor()
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     options = _default_options(args)
-
     existing_paths = [path for path in args.files if path.exists()]
     skip_tag_updates = args.stored_tag_policy == "skip" and not args.undo_requested
-
-    album_summary_enabled = (
-        bool(existing_paths)
-        and args.apply_mode != "track"
-        and not args.track_only_analysis
-        and args.stored_tag_policy != "check_only"
-        and not args.undo_requested
-        and args.single_channel is None
-        and args.direct_gain_steps is None
-        and not args.delete_tags_requested
+    album_summary = _prepare_album_summary(
+        args,
+        processor=processor,
+        existing_paths=existing_paths,
     )
-    album_steps: int | None = None
-    album_db_gain: float | None = None
-    album_max_amp: float | None = None
-    album_min_gain: int | None = None
-    album_max_gain: int | None = None
-    album_tag_gain: float = 0.0
-    single_track_album_override: tuple[int, float, float, int, int] | None = None
-
-    if album_summary_enabled:
-        single_existing = None
-        if (
-            len(existing_paths) == 1
-            and args.stored_tag_policy == "auto"
-            and args.stored_tag_policy != "recalc"
-        ):
-            candidate = _load_runtime_tags(
-                processor, existing_paths[0], tag_format=args.tag_format
-            )
-            if (
-                candidate.track_gain_db is not None
-                and candidate.track_peak is not None
-                and candidate.min_gain is not None
-                and candidate.max_gain is not None
-            ):
-                single_existing = candidate
-
-        if single_existing is not None:
-            if single_existing.album_gain_db is not None:
-                album_tag_gain = single_existing.album_gain_db
-            else:
-                album_tag_gain = single_existing.track_gain_db or 0.0
-            album_db_gain = album_tag_gain + args.db_mod
-            album_steps = db_to_legacy_steps(
-                album_db_gain, mp3_gain_mod=args.mp3_gain_mod
-            )
-            album_max_amp = (
-                single_existing.track_peak
-                if single_existing.track_peak is not None
-                else single_existing.album_peak
-            ) * 32768.0
-            album_min_gain = (
-                single_existing.min_gain
-                if single_existing.min_gain is not None
-                else single_existing.album_min_gain
-            )
-            album_max_gain = (
-                single_existing.max_gain
-                if single_existing.max_gain is not None
-                else single_existing.album_max_gain
-            )
-        else:
-            if hasattr(processor, "analyze_album_metrics"):
-                album_tag_gain, album_min_gain, album_max_gain, album_max_amp = (
-                    processor.analyze_album_metrics(
-                        existing_paths,
-                        include_gain=not args.max_amp_only,
-                    )
-                )
-            else:
-                album_tag_gain = (
-                    0.0
-                    if args.max_amp_only
-                    else processor.analyze_album_gain_db(existing_paths)
-                )
-                album_min_gain, album_max_gain = processor.analyze_album_minmax_gain(
-                    existing_paths
-                )
-                album_max_amp = max(
-                    (processor.analyze_max_amplitude(path) for path in existing_paths),
-                    default=0.0,
-                )
-            album_db_gain = album_tag_gain + args.db_mod
-            album_steps = db_to_legacy_steps(
-                album_db_gain, mp3_gain_mod=args.mp3_gain_mod
-            )
-        if (
-            args.apply_mode == "album"
-            and args.auto_clip
-            and album_steps is not None
-            and album_max_amp is not None
-        ):
-            max_no_clip = _max_no_clip_steps(album_max_amp)
-            if max_no_clip is not None and album_steps > max_no_clip:
-                album_steps = max_no_clip
 
     failures = 0
     for path in args.files:
@@ -722,380 +1470,19 @@ def main(argv: list[str] | None = None) -> int:
             if not args.quiet:
                 print(f"{path}\tERROR\tmissing file")
             continue
-
-        # Branch ordering intentionally follows legacy behavior classes.
-        if args.stored_tag_policy == "check_only":
-            tags = _load_runtime_tags(processor, path, tag_format=args.tag_format)
-            if args.table_output:
-                print(_format_check_only_table_line(path, tags))
-            elif not args.quiet and tags.track_gain_db is not None:
-                steps = db_to_legacy_steps(tags.track_gain_db, mp3_gain_mod=0)
-                db_gain = tags.track_gain_db
-                print(
-                    f'Recommended "Track" dB change: {db_gain:.6f}\n'
-                    f'Recommended "Track" mp3 gain change: {steps}\n'
-                    f"Applied step dB (exact): {legacy_steps_to_db_exact(steps):.6f}"
-                )
+        if _handle_check_only_path(args, processor=processor, path=path):
             continue
-
-        loaded_tags = _load_runtime_tags(processor, path, tag_format=args.tag_format)
-        tags = loaded_tags if not skip_tag_updates else TagData()
-        original_tags = copy.deepcopy(loaded_tags)
-        tag_dirty = False
-        if args.stored_tag_policy == "recalc" and not skip_tag_updates:
-            tag_dirty = _clear_recalc_fields(tags)
-
-        if args.undo_requested:
-            undo_left = tags.undo_left
-            undo_right = tags.undo_right
-            if (
-                undo_left is not None
-                and undo_right is not None
-                and (undo_left != 0 or undo_right != 0)
-            ):
-                result = processor.apply_steps(
-                    path,
-                    left_steps=undo_left,
-                    right_steps=undo_right,
-                    options=options,
-                )
-                if result.exit_code != 0:
-                    failures += 1
-                    if not args.quiet:
-                        print(f"{path}\tERROR\t{result.message}")
-                    continue
-                _apply_gain_and_update_tags(
-                    tags,
-                    left_gain_change=undo_left,
-                    right_gain_change=undo_right,
-                    wrap_gain=args.wrap_gain,
-                )
-                _write_runtime_tags(
-                    processor,
-                    path,
-                    tags,
-                    tag_format=args.tag_format,
-                    preserve_timestamp=args.preserve_timestamp,
-                )
-            elif args.table_output:
-                print(f"{path}\t0\t0")
-            elif not args.quiet:
-                if tags.has_undo:
-                    print(f"No changes to undo in {path}", file=sys.stderr)
-                else:
-                    print(f"No undo information in {path}", file=sys.stderr)
-            continue
-
-        if args.single_channel is not None:
-            result = processor.apply_single_channel_steps(
-                path,
-                channel_index=args.single_channel.channel_index,
-                steps=args.single_channel.steps,
-                options=options,
-            )
-            if result.exit_code != 0:
-                if not skip_tag_updates:
-                    left = (
-                        args.single_channel.steps
-                        if args.single_channel.channel_index == 0
-                        else 0
-                    )
-                    right = (
-                        args.single_channel.steps
-                        if args.single_channel.channel_index == 1
-                        else 0
-                    )
-                    _apply_gain_and_update_tags(
-                        tags,
-                        left_gain_change=left,
-                        right_gain_change=right,
-                        wrap_gain=args.wrap_gain,
-                    )
-                    _write_runtime_tags(
-                        processor,
-                        path,
-                        tags,
-                        tag_format=args.tag_format,
-                        preserve_timestamp=args.preserve_timestamp,
-                    )
-                failures += 1
-                if not args.quiet:
-                    print(f"{path}: {result.message}")
-                continue
-            if not skip_tag_updates and args.single_channel.steps != 0:
-                left = (
-                    args.single_channel.steps
-                    if args.single_channel.channel_index == 0
-                    else 0
-                )
-                right = (
-                    args.single_channel.steps
-                    if args.single_channel.channel_index == 1
-                    else 0
-                )
-                _apply_gain_and_update_tags(
-                    tags,
-                    left_gain_change=left,
-                    right_gain_change=right,
-                    wrap_gain=args.wrap_gain,
-                )
-                _write_runtime_tags(
-                    processor,
-                    path,
-                    tags,
-                    tag_format=args.tag_format,
-                    preserve_timestamp=args.preserve_timestamp,
-                )
-            continue
-
-        if args.direct_gain_steps is not None:
-            result = processor.apply_direct_gain_steps(
-                path, steps=args.direct_gain_steps, options=options
-            )
-            if result.exit_code != 0:
-                failures += 1
-                if not args.quiet:
-                    print(f"{path}\tERROR\t{result.message}")
-                continue
-            if not skip_tag_updates and args.direct_gain_steps != 0:
-                _apply_gain_and_update_tags(
-                    tags,
-                    left_gain_change=args.direct_gain_steps,
-                    right_gain_change=args.direct_gain_steps,
-                    wrap_gain=args.wrap_gain,
-                )
-                _write_runtime_tags(
-                    processor,
-                    path,
-                    tags,
-                    tag_format=args.tag_format,
-                    preserve_timestamp=args.preserve_timestamp,
-                )
-            continue
-
-        if args.delete_tags_requested:
-            result = processor.delete_mp3gain_tags(path, tag_format=args.tag_format)
-            if result.exit_code != 0:
-                failures += 1
-                if not args.quiet:
-                    print(f"{path}\tERROR\t{result.message}")
-            continue
-
-        used_auto_tags = (
-            args.stored_tag_policy == "auto"
-            and tags.tag_format != "none"
-            and tags.track_gain_db is not None
-            and tags.track_peak is not None
-            and tags.min_gain is not None
-            and tags.max_gain is not None
-            and args.stored_tag_policy != "recalc"
-        )
-        used_skip_fallback = (
-            args.stored_tag_policy == "skip"
-            and original_tags.track_gain_db is not None
-            and original_tags.track_peak is not None
-            and original_tags.min_gain is not None
-            and original_tags.max_gain is not None
-        )
-        if used_auto_tags or used_skip_fallback:
-            source_tags = tags if used_auto_tags else original_tags
-            raw_gain = source_tags.track_gain_db or 0.0
-            max_amp = (source_tags.track_peak or 0.0) * 32768.0
-            min_gain = source_tags.min_gain or 0
-            max_gain = source_tags.max_gain or 0
-        else:
-            if hasattr(processor, "analyze_track_metrics"):
-                raw_gain, max_amp, min_gain, max_gain = processor.analyze_track_metrics(
-                    path,
-                    include_gain=not args.max_amp_only,
-                )
-            else:
-                raw_gain = (
-                    0.0 if args.max_amp_only else processor.analyze_track_gain_db(path)
-                )
-                max_amp = processor.analyze_max_amplitude(path)
-                min_gain, max_gain = processor.analyze_minmax_gain(path)
-            if args.stored_tag_policy in {"recalc", "skip"}:
-                if (
-                    original_tags.track_peak is not None
-                    and abs(max_amp - (original_tags.track_peak * 32768.0)) >= 1.0
-                ):
-                    max_amp = original_tags.track_peak * 32768.0
-                if (
-                    original_tags.track_gain_db is not None
-                    and abs(raw_gain - original_tags.track_gain_db) <= 0.1
-                ):
-                    raw_gain = original_tags.track_gain_db
-            if not skip_tag_updates:
-                tag_dirty = (
-                    _update_track_tags_from_analysis(
-                        tags,
-                        raw_gain_db=raw_gain,
-                        max_amp=max_amp,
-                        min_gain=min_gain,
-                        max_gain=max_gain,
-                        max_amp_only=args.max_amp_only,
-                    )
-                    or tag_dirty
-                )
-
-        if args.max_amp_only:
-            base_gain = (
-                tags.track_gain_db
-                if (args.stored_tag_policy == "auto" and tags.track_gain_db is not None)
-                else 0.0
-            )
-        else:
-            base_gain = raw_gain
-        db_gain = base_gain + args.db_mod
-        steps = db_to_legacy_steps(db_gain, mp3_gain_mod=args.mp3_gain_mod)
-
-        if (
-            album_summary_enabled
-            and album_max_amp is not None
-            and album_min_gain is not None
-            and album_max_gain is not None
-            and (len(existing_paths) > 1 or args.apply_mode == "album")
-            and not skip_tag_updates
-        ):
-            tag_dirty = (
-                _update_album_tags_from_analysis(
-                    tags,
-                    album_gain_db=album_tag_gain,
-                    album_max_amp=album_max_amp,
-                    album_min_gain=album_min_gain,
-                    album_max_gain=album_max_gain,
-                    max_amp_only=args.max_amp_only,
-                )
-                or tag_dirty
-            )
-
-        if len(existing_paths) == 1 and args.stored_tag_policy in {"skip", "recalc"}:
-            single_track_album_override = (steps, db_gain, max_amp, min_gain, max_gain)
-
-        applied_steps = steps
-        if args.apply_mode == "album" and album_steps is not None:
-            applied_steps = album_steps
-
-        if args.apply_mode == "track" and args.auto_clip:
-            max_no_clip = _max_no_clip_steps(max_amp)
-            if max_no_clip is not None and applied_steps > max_no_clip:
-                applied_steps = max_no_clip
-        elif (
-            args.apply_mode == "track"
-            and not args.clip_confirmed
-            and _would_clip(max_amp, applied_steps)
-        ):
-            failures += 1
-            if not args.quiet:
-                print(f"{path}\tERROR\tclipping risk; rerun with /c or /k")
-            if not skip_tag_updates and tag_dirty:
-                _write_runtime_tags(
-                    processor,
-                    path,
-                    tags,
-                    tag_format=args.tag_format,
-                    preserve_timestamp=args.preserve_timestamp,
-                )
-            continue
-
-        if (
-            args.apply_mode == "album"
-            and not args.auto_clip
-            and not args.clip_confirmed
-            and _would_clip(max_amp, applied_steps)
-        ):
-            failures += 1
-            if not args.quiet:
-                print(f"{path}\tERROR\tclipping risk; rerun with /c or /k")
-            if not skip_tag_updates and tag_dirty:
-                _write_runtime_tags(
-                    processor,
-                    path,
-                    tags,
-                    tag_format=args.tag_format,
-                    preserve_timestamp=args.preserve_timestamp,
-                )
-            continue
-
-        if args.apply_mode in {"track", "album"} and applied_steps != 0:
-            if not args.table_output:
-                print(path)
-                print(f"Applying mp3 gain change of {applied_steps} to {path}...")
-            result = processor.apply_steps(
-                path, left_steps=applied_steps, options=options
-            )
-            if result.exit_code != 0:
-                failures += 1
-                if not args.quiet:
-                    print(f"{path}\tERROR\t{result.message}")
-                continue
-            if not skip_tag_updates:
-                _apply_gain_and_update_tags(
-                    tags,
-                    left_gain_change=applied_steps,
-                    right_gain_change=applied_steps,
-                    wrap_gain=args.wrap_gain,
-                )
-                tag_dirty = True
-
-        if not skip_tag_updates and tag_dirty:
-            _write_runtime_tags(
-                processor,
-                path,
-                tags,
-                tag_format=args.tag_format,
-                preserve_timestamp=args.preserve_timestamp,
-            )
-
-        if args.table_output:
-            print(
-                _format_table_line(
-                    path,
-                    steps=steps,
-                    db_gain=db_gain,
-                    max_amp=max_amp,
-                    min_gain=min_gain,
-                    max_gain=max_gain,
-                )
-            )
-        elif not args.quiet and args.apply_mode == "none":
-            print(
-                f'Recommended "Track" dB change: {db_gain:.6f}\n'
-                f'Recommended "Track" mp3 gain change: {steps}\n'
-                f"Applied step dB (exact): {legacy_steps_to_db_exact(steps):.6f}"
-            )
-
-    if (
-        args.table_output
-        and album_summary_enabled
-        and album_steps is not None
-        and album_db_gain is not None
-        and album_max_amp is not None
-        and args.apply_mode != "track"
-        and args.stored_tag_policy != "check_only"
-        and not args.undo_requested
-        and args.single_channel is None
-        and args.direct_gain_steps is None
-        and not args.delete_tags_requested
-    ):
-        if single_track_album_override is not None:
-            album_steps = single_track_album_override[0]
-            album_db_gain = single_track_album_override[1]
-            album_max_amp = single_track_album_override[2]
-            album_min_gain = single_track_album_override[3]
-            album_max_gain = single_track_album_override[4]
-        print(
-            _format_table_line(
-                '"Album"',
-                steps=album_steps,
-                db_gain=album_db_gain,
-                max_amp=album_max_amp,
-                min_gain=album_min_gain or 0,
-                max_gain=album_max_gain or 0,
-            )
+        failures += _process_standard_path(
+            args,
+            processor=processor,
+            path=path,
+            options=options,
+            skip_tag_updates=skip_tag_updates,
+            existing_paths=existing_paths,
+            album_summary=album_summary,
         )
 
+    _emit_album_summary(args, album_summary)
     return 1 if failures else 0
 
 

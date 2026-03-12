@@ -448,7 +448,8 @@ def main() -> int:
 
     if len(common_names) < sample_size:
         raise RuntimeError(
-            f"Not enough common files for sample_size={sample_size}: common={len(common_names)}"
+            f"Not enough common files for sample_size={sample_size}: "
+            f"common={len(common_names)}"
         )
 
     selected_names = _select_sample_names(
