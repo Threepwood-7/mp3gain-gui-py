@@ -60,14 +60,14 @@ class FileListModel(QAbstractTableModel):
 
     # ── Qt overrides ───────────────────────────────────────────────────────
 
-    def rowCount(  # noqa: N802
+    def rowCount(
         self, parent: QModelIndex | QPersistentModelIndex = _DEFAULT_MODEL_INDEX
     ) -> int:
         if parent.isValid():
             return 0
         return len(self._entries)
 
-    def columnCount(  # noqa: N802
+    def columnCount(
         self, parent: QModelIndex | QPersistentModelIndex = _DEFAULT_MODEL_INDEX
     ) -> int:
         if parent.isValid():

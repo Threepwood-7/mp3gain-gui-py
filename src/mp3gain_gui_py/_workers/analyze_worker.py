@@ -95,9 +95,7 @@ class AnalyzeWorker:
             )
         )
 
-    def _run_album(  # noqa: C901 - album analysis aggregates worker state and progress
-        self, *, paths: list[Path], total: int
-    ) -> None:
+    def _run_album(self, *, paths: list[Path], total: int) -> None:
         req = self._request
         succeeded = 0
         failed = 0

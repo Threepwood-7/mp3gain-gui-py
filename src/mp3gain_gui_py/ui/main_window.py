@@ -83,13 +83,13 @@ class MainWindow(QMainWindow):
 
     # ── Drag-and-drop ─────────────────────────────────────────────────────────
 
-    def dragEnterEvent(self, event: Any) -> None:  # noqa: N802
+    def dragEnterEvent(self, event: Any) -> None:
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
         else:
             event.ignore()
 
-    def dropEvent(self, event: Any) -> None:  # noqa: N802
+    def dropEvent(self, event: Any) -> None:
         urls = event.mimeData().urls()
         paths: list[Path] = []
         for url in urls:

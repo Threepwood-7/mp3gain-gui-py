@@ -10,13 +10,14 @@ import hashlib
 import os
 import subprocess
 import sys
+from importlib import import_module
 from pathlib import Path
 
 SRC_DIR = Path(__file__).resolve().parents[1] / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from mp3gain_gui_py._tags.formats import ALL_MP3GAIN_KEYS  # noqa: E402
+ALL_MP3GAIN_KEYS = import_module("mp3gain_gui_py._tags.formats").ALL_MP3GAIN_KEYS
 
 LEGACY_ORACLE_EXE = Path("c:/bin/mp3gain-win-1_2_5/mp3gain.exe")
 LEGACY_SOURCE_DIR = Path("c:/prj/misc/mp3gain/mp3gain-1_5_2-src")

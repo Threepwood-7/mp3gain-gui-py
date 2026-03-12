@@ -123,7 +123,7 @@ def _parse_single_channel_value(value: str) -> _SingleChannelRequest:
     )
 
 
-def _parse_legacy_args(  # noqa: C901 - legacy switch grammar mirrors original CLI
+def _parse_legacy_args(
     argv: list[str] | None,
 ) -> _LegacyCliArgs:
     tokens = list(sys.argv[1:] if argv is None else argv)
@@ -571,7 +571,7 @@ def _format_check_only_table_line(path: Path, tags: TagData) -> str:
     )
 
 
-def main(argv: list[str] | None = None) -> int:  # noqa: C901 - legacy CLI execution matrix
+def main(argv: list[str] | None = None) -> int:
     """Run legacy-compatible CLI argument handling and file operations.
 
     Legacy pointer: LEGACY_PTR:CLI_SWITCH_SURFACE.
