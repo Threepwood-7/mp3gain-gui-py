@@ -44,7 +44,7 @@ def _set8_bits(data: bytearray, byte_off: int, bit_off: int, value: int) -> None
     data[byte_off + 1] = (data[byte_off + 1] & mask_right) | (v & 0xFF)
 
 
-def apply_gain_change(
+def apply_gain_change(  # noqa: C901 - legacy frame mutation routine
     path: Path,
     gain_delta: int,
     *,
