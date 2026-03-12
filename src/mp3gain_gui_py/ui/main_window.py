@@ -41,11 +41,13 @@ class MainWindow(QMainWindow):
         self._bridge = bridge
 
         # Model
-        self.model = FileListModel(parent=self)
+        self.model: FileListModel = FileListModel(parent=self)
 
         # Coordinators
-        self.layout_coord = WindowLayoutCoordinator(self, self.model)
-        self.status_coord = WindowStatusCoordinator(self)
+        self.layout_coord: WindowLayoutCoordinator = WindowLayoutCoordinator(
+            self, self.model
+        )
+        self.status_coord: WindowStatusCoordinator = WindowStatusCoordinator(self)
         self._actions = WindowActionsCoordinator(self, settings, bridge)
         self._persistence = WindowPersistenceCoordinator(
             self, settings, self.layout_coord

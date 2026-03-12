@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     import array
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
     from pathlib import Path
 
 
@@ -27,14 +27,17 @@ def iter_pcm_chunks(
 
     sample_rate, _nch = read_mp3_info(path)
 
-    for block in miniaudio.stream_file(
+    stream_file = cast(
+        "Callable[..., Iterator[array.array[float]]]",
+        miniaudio.stream_file,
+    )
+    for samples in stream_file(
         str(path),
         output_format=miniaudio.SampleFormat.FLOAT32,
         nchannels=2,
         sample_rate=sample_rate,
         frames_to_read=chunk_frames,
     ):
-        samples: array.array[float] = block  # type: ignore[assignment]
         yield sample_rate, 2, samples
 
 

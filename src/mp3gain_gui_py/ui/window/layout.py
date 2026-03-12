@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 
 if TYPE_CHECKING:
     from ..._model.file_list_model import FileListModel
-    from .._main_window import MainWindow
+    from ..main_window import MainWindow
 
 
 class WindowLayoutCoordinator:

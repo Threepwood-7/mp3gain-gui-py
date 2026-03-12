@@ -69,6 +69,7 @@ dependencies = [
   "basedpyright>=1.18",
   "deptry>=0.24",
   "vulture>=2.15",
+  "numpy>=1.26",
 ]
 
 [tool.hatch.envs.lint.scripts]
@@ -198,36 +199,7 @@ known_first_party = ["mp3gain_gui_py", "_common", "parity_common"]
 pythonVersion = "3.13"
 pythonPlatform = "All"
 typeCheckingMode = "strict"
-# Keep strict mode enabled while suppressing the current application-level
-# backlog of noisy diagnostics that would otherwise block rollout validation.
-reportArgumentType = "none"
-reportAssignmentType = "none"
-reportAttributeAccessIssue = "none"
-reportCallIssue = "none"
-reportGeneralTypeIssues = "none"
-reportIncompatibleMethodOverride = "none"
-reportIncompatibleVariableOverride = "none"
-reportIndexIssue = "none"
-reportInvalidTypeForm = "none"
-reportMissingImports = "none"
-reportMissingParameterType = "none"
-reportMissingTypeArgument = "none"
-reportMissingTypeStubs = "none"
-reportOptionalMemberAccess = "none"
-reportOptionalSubscript = "none"
-reportPossiblyUnboundVariable = "none"
-reportPrivateImportUsage = "none"
-reportRedeclaration = "none"
-reportReturnType = "none"
-reportUnknownArgumentType = "none"
-reportUnknownLambdaType = "none"
-reportUnknownMemberType = "none"
-reportUnknownParameterType = "none"
-reportUnknownVariableType = "none"
-reportUnnecessaryCast = "none"
-reportUnnecessaryIsInstance = "none"
-venvPath = "."
-venv = ".venv"
+stubPath = "typings"
 include = ["src"]
 exclude = ["tests", "**/__pycache__"]
 

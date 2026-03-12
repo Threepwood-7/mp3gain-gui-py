@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QFileDialog, QMenu, QToolBar
+from PySide6.QtWidgets import QFileDialog, QMenuBar, QToolBar
 from threep_commons.qt.slots import safe_slot
 
 from ..._workers.types import WorkerRequest
@@ -14,7 +14,7 @@ from ..._workers.types import WorkerRequest
 if TYPE_CHECKING:
     from ..._settings.manager import SettingsManager
     from ..._workers.worker_bridge import WorkerBridge
-    from .._main_window import MainWindow
+    from ..main_window import MainWindow
 
 
 class WindowActionsCoordinator:
@@ -104,27 +104,27 @@ class WindowActionsCoordinator:
         tb.addAction(self.act_options)
 
     def _build_menus(self) -> None:
-        mb = self._window.menuBar()
-        if mb is None:
-            return
+        mb: QMenuBar = self._window.menuBar()
 
         # File menu
-        file_menu: QMenu = mb.addMenu("&File")  # type: ignore[assignment]
+        file_menu = mb.addMenu("&File")
         file_menu.addAction(self.act_add_files)
         file_menu.addAction(self.act_add_folder)
         file_menu.addSeparator()
         file_menu.addAction(self.act_remove)
         file_menu.addAction(self.act_clear)
         file_menu.addSeparator()
-        file_menu.addAction("E&xit", self._window.close)
+        exit_action = QAction("E&xit", self._window)
+        exit_action.triggered.connect(self._window.close)
+        file_menu.addAction(exit_action)
 
         # Analysis menu
-        analysis_menu: QMenu = mb.addMenu("&Analysis")  # type: ignore[assignment]
+        analysis_menu = mb.addMenu("&Analysis")
         analysis_menu.addAction(self.act_track_analyze)
         analysis_menu.addAction(self.act_album_analyze)
 
         # Gain menu
-        gain_menu: QMenu = mb.addMenu("&Gain")  # type: ignore[assignment]
+        gain_menu = mb.addMenu("&Gain")
         gain_menu.addAction(self.act_apply_track)
         gain_menu.addAction(self.act_apply_album)
         gain_menu.addAction(self.act_apply_constant)
@@ -133,11 +133,11 @@ class WindowActionsCoordinator:
         gain_menu.addAction(self.act_delete_tags)
 
         # Options menu
-        options_menu: QMenu = mb.addMenu("&Options")  # type: ignore[assignment]
+        options_menu = mb.addMenu("&Options")
         options_menu.addAction(self.act_options)
 
         # Help menu
-        help_menu: QMenu = mb.addMenu("&Help")  # type: ignore[assignment]
+        help_menu = mb.addMenu("&Help")
         help_menu.addAction(self.act_about)
 
     # ── Slot implementations ─────────────────────────────────────────────────

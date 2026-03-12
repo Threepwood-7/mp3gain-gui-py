@@ -8,9 +8,10 @@ Legacy Pointers:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from pathlib import Path
 
 from .formats import (
@@ -96,7 +97,12 @@ def _read_apev2(path: Path) -> TagData | None:
         return None
 
     data = TagData(tag_format="apev2")
-    _fill_from_dict({k.upper(): str(v) for k, v in tags.items()}, data)
+    raw: dict[str, str] = {}
+    tag_items = cast("Iterable[tuple[object, object]]", tags.items())
+    for raw_key, raw_value in tag_items:
+        key = str(raw_key).upper()
+        raw[key] = str(raw_value)
+    _fill_from_dict(raw, data)
     return data
 
 
@@ -110,10 +116,13 @@ def _read_id3(path: Path) -> TagData | None:
 
     # Collect TXXX frames
     raw: dict[str, str] = {}
-    for key, frame in tags.items():
+    frame_items = cast("Iterable[tuple[object, object]]", tags.items())
+    for raw_key, raw_frame in frame_items:
+        key = str(raw_key)
         if key.startswith("TXXX:"):
             desc = key[5:].upper()
-            raw[desc] = str(frame.text[0]) if frame.text else ""
+            text_values = cast("list[Any] | None", getattr(raw_frame, "text", None))
+            raw[desc] = str(text_values[0]) if text_values else ""
 
     if not raw:
         return None

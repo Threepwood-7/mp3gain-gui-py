@@ -8,7 +8,7 @@ Legacy Pointers:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from .formats import (
     ALL_MP3GAIN_KEYS,
@@ -27,6 +27,7 @@ from .formats import (
 from .legacy_apev2 import delete_legacy_apev2_keys, write_legacy_apev2_tags
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from pathlib import Path
 
     from .reader import TagData
@@ -94,12 +95,12 @@ def _write_id3(path: Path, data: TagData) -> None:
         tags = _id3.ID3()
 
     kv = _build_kv(data)
-    txxx_frame = _id3.Frames["TXXX"]
+    txxx_frame = cast("type[Any]", _id3.Frames["TXXX"])
     for key, value in kv.items():
         frame_key = f"TXXX:{key}"
         tags[frame_key] = txxx_frame(encoding=3, desc=key, text=[value])
 
-    tags.save(str(path))
+    cast("Any", tags).save(str(path))
 
 
 def _delete_id3_keys(path: Path) -> None:
@@ -108,14 +109,16 @@ def _delete_id3_keys(path: Path) -> None:
 
         tags = _id3.ID3(str(path))
         changed = False
-        for key in list(tags.keys()):
+        tag_keys = list(cast("Iterable[object]", tags.keys()))
+        for raw_key in tag_keys:
+            key = str(raw_key)
             if key.startswith("TXXX:"):
                 desc = key[5:].upper()
                 if desc in ALL_MP3GAIN_KEYS:
                     del tags[key]
                     changed = True
         if changed:
-            tags.save(str(path))
+            cast("Any", tags).save(str(path))
     except Exception:
         pass
 

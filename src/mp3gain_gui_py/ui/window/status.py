@@ -7,14 +7,14 @@ from typing import TYPE_CHECKING
 from PySide6.QtWidgets import QLabel, QStatusBar
 
 if TYPE_CHECKING:
-    from .._main_window import MainWindow
+    from ..main_window import MainWindow
 
 
 class WindowStatusCoordinator:
     """Manages a 3-panel status bar: message | current file | ETA."""
 
     def __init__(self, window: MainWindow) -> None:
-        bar: QStatusBar = window.statusBar()  # type: ignore[assignment]
+        bar: QStatusBar = window.statusBar()
         bar.setSizeGripEnabled(True)
 
         self._msg_label = QLabel("Ready")
