@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from threep_commons.settings import (
-    QSettingsJsonStorage,
+    QSettingsValueStore,
     SettingsManagerBase,
     delegate_domain_property,
 )
@@ -18,7 +18,7 @@ class SettingsManager(SettingsManagerBase, SettingsRegistry):
     """Settings facade composed from UI, operations and session domains."""
 
     def __init__(self) -> None:
-        super().__init__(QSettingsJsonStorage(APP_IDENTITY))
+        super().__init__(QSettingsValueStore.from_identity(APP_IDENTITY))
         self.ui = UiSettingsDomain(self._storage)
         self.ops = OpsSettingsDomain(self._storage)
         self.session = SessionSettingsDomain(self._storage)
