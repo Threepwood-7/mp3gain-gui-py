@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-from pytestqt.qtbot import QtBot
+from typing import TYPE_CHECKING
 
 from mp3gain_gui_py.ui.dialogs.options_dialog import OptionsDialog
+
+if TYPE_CHECKING:
+    from pytestqt.qtbot import QtBot
 
 
 @dataclass

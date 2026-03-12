@@ -145,7 +145,9 @@ def test_runtime_modifiers_m_and_d_execute_python_path(
     assert 'Recommended "Track" dB change' in out
 
 
-def test_runtime_undo_uses_python_processor(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_runtime_undo_uses_python_processor(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     target = tmp_path / "sample.mp3"
     target.write_bytes(b"x")
     fake = _install_fake_processor(monkeypatch)
@@ -172,7 +174,9 @@ def test_no_oracle_passthrough_symbols_remain() -> None:
     assert not hasattr(legacy_cli, "_run_oracle_passthrough")
 
 
-def test_help_qmark_without_files_returns_one(capsys: pytest.CaptureFixture[str]) -> None:
+def test_help_qmark_without_files_returns_one(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     code = legacy_cli.main(["/?"])
     _ = capsys.readouterr()
     assert code == 1

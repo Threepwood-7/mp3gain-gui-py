@@ -37,7 +37,9 @@ class SettingsManager(SettingsManagerBase, SettingsRegistry):
     # Ops domain delegates
     wrap_gain = delegate_domain_property("ops", "wrap_gain")
     reckless_mode = delegate_domain_property("ops", "reckless_mode")
-    force_apply_normalization = delegate_domain_property("ops", "force_apply_normalization")
+    force_apply_normalization = delegate_domain_property(
+        "ops", "force_apply_normalization"
+    )
     apply_zero_step = delegate_domain_property("ops", "apply_zero_step")
 
     # Session domain delegates

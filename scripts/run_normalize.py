@@ -14,14 +14,14 @@ Usage examples:
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
 import os
-from pathlib import Path
 import shutil
 import stat
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -32,7 +32,14 @@ SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from mp3gain_gui_py._legacy_exact.math import db_to_legacy_steps
+
+def _load_db_to_legacy_steps():
+    from mp3gain_gui_py._legacy_exact.math import db_to_legacy_steps
+
+    return db_to_legacy_steps
+
+
+db_to_legacy_steps = _load_db_to_legacy_steps()
 
 DEFAULT_TARGET_DB = 89.0
 
@@ -181,7 +188,9 @@ def _parse_analysis_mp3_gain(stdout_text: str, *, target_file: Path) -> int:
     raise ValueError("Could not parse MP3 gain steps from analysis output.")
 
 
-def _run_command(command: list[str], *, repo_root: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+def _run_command(
+    command: list[str], *, repo_root: Path, env: dict[str, str]
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         command,
         cwd=repo_root,
@@ -222,7 +231,9 @@ def _process_file(
         )
 
     try:
-        analyzed_steps = _parse_analysis_mp3_gain(analyze_completed.stdout, target_file=target_file)
+        analyzed_steps = _parse_analysis_mp3_gain(
+            analyze_completed.stdout, target_file=target_file
+        )
     except ValueError as exc:
         return NormalizeResult(
             index=index,
@@ -351,7 +362,8 @@ def main() -> int:
     else:
         dst_dir.mkdir(parents=True, exist_ok=True)
         targets = [
-            _prepare_destination(src_file, src_root=src_dir, dst_root=dst_dir) for src_file in src_files
+            _prepare_destination(src_file, src_root=src_dir, dst_root=dst_dir)
+            for src_file in src_files
         ]
 
     total = len(targets)

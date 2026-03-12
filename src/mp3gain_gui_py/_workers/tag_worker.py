@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .process_tasks import delete_tags_file_task
 from .types import FileResult, WorkerRequest, WorkerResult
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from .worker_bridge import WorkerBridge
 
 

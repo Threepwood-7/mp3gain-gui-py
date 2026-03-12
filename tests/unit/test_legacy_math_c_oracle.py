@@ -21,7 +21,9 @@ def _require_oracle() -> object:
     return load_c_oracle()
 
 
-def _python_tag_update(tag: CTagState, left: int, right: int, wrap_gain: int) -> CTagState:
+def _python_tag_update(
+    tag: CTagState, left: int, right: int, wrap_gain: int
+) -> CTagState:
     if left == 0 and right == 0:
         return tag
 
@@ -57,9 +59,7 @@ def _python_tag_update(tag: CTagState, left: int, right: int, wrap_gain: int) ->
             if cur_min < 0 or cur_min > 255 or cur_max < 0 or cur_max > 255:
                 tag.have_minmax_gain = 0
         else:
-            if tag.min_gain == 0:
-                tag.min_gain = 0
-            elif cur_min < 0:
+            if tag.min_gain == 0 or cur_min < 0:
                 tag.min_gain = 0
             elif cur_min > 255:
                 tag.min_gain = 255
@@ -74,9 +74,7 @@ def _python_tag_update(tag: CTagState, left: int, right: int, wrap_gain: int) ->
             if cur_min < 0 or cur_min > 255 or cur_max < 0 or cur_max > 255:
                 tag.have_album_minmax_gain = 0
         else:
-            if tag.album_min_gain == 0:
-                tag.album_min_gain = 0
-            elif cur_min < 0:
+            if tag.album_min_gain == 0 or cur_min < 0:
                 tag.album_min_gain = 0
             elif cur_min > 255:
                 tag.album_min_gain = 255
@@ -167,7 +165,9 @@ def test_autoclip_track_formula_matches_c_oracle_known_values() -> None:
         if max_sample <= 0.0:
             expected = requested
         else:
-            max_no_clip = math.floor(4.0 * math.log10(32767.0 / max_sample) / math.log10(2.0))
+            max_no_clip = math.floor(
+                4.0 * math.log10(32767.0 / max_sample) / math.log10(2.0)
+            )
             expected = min(requested, int(max_no_clip))
         assert oracle.mp3gain_c_autoclip_track_gain(requested, max_sample) == expected
 

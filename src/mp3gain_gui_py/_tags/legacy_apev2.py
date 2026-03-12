@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .formats import (
     ALL_MP3GAIN_KEYS,
@@ -26,6 +26,9 @@ from .formats import (
     format_undo,
 )
 from .reader import TagData
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _APE_ID = b"APETAGEX"
 _APE_STRUCT_SIZE = 32
@@ -76,7 +79,9 @@ def write_legacy_apev2_tags(path: Path, data: TagData) -> None:
     else:
         ape_bytes = b""
 
-    new_payload = payload[: parsed.base_end] + ape_bytes + payload[parsed.trailer_start :]
+    new_payload = (
+        payload[: parsed.base_end] + ape_bytes + payload[parsed.trailer_start :]
+    )
     _atomic_write(path, new_payload)
 
 
@@ -108,9 +113,17 @@ def _build_mp3gain_fields(data: TagData) -> bytes:
     if data.min_gain is not None and data.max_gain is not None:
         kv[TAG_MP3GAIN_MINMAX] = format_minmax(data.min_gain, data.max_gain)
     if data.album_min_gain is not None and data.album_max_gain is not None:
-        kv[TAG_MP3GAIN_ALBUM_MINMAX] = format_minmax(data.album_min_gain, data.album_max_gain)
-    if data.undo_left is not None and data.undo_right is not None and data.undo_mode is not None:
-        kv[TAG_MP3GAIN_UNDO] = format_undo(data.undo_left, data.undo_right, data.undo_mode)
+        kv[TAG_MP3GAIN_ALBUM_MINMAX] = format_minmax(
+            data.album_min_gain, data.album_max_gain
+        )
+    if (
+        data.undo_left is not None
+        and data.undo_right is not None
+        and data.undo_mode is not None
+    ):
+        kv[TAG_MP3GAIN_UNDO] = format_undo(
+            data.undo_left, data.undo_right, data.undo_mode
+        )
     if data.track_gain_db is not None:
         kv[TAG_TRACK_GAIN] = format_gain(data.track_gain_db)
     if data.track_peak is not None:

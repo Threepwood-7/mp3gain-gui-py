@@ -106,8 +106,12 @@ class AnalyzeWorker:
         groups = req.album_groups if req.album_groups else self._group_by_parent(paths)
         group_items = list(groups.values())
 
-        group_futures: dict[Future[tuple[tuple[str, ...], float | None]], tuple[Path, ...]] = {}
-        with ProcessPoolExecutor(max_workers=self._max_workers(len(group_items))) as group_executor:
+        group_futures: dict[
+            Future[tuple[tuple[str, ...], float | None]], tuple[Path, ...]
+        ] = {}
+        with ProcessPoolExecutor(
+            max_workers=self._max_workers(len(group_items))
+        ) as group_executor:
             for group_paths in group_items:
                 if self._bridge.is_cancelled:
                     cancelled = True
@@ -197,7 +201,9 @@ class AnalyzeWorker:
         return groups
 
     @staticmethod
-    def _with_album_fields(result: FileResult, *, target_db: float, album_raw_db: float) -> FileResult:
+    def _with_album_fields(
+        result: FileResult, *, target_db: float, album_raw_db: float
+    ) -> FileResult:
         album_volume_db = target_db - album_raw_db
         max_amp = result.max_amplitude or 0.0
         clip_album = max_amp * _db_to_linear(album_raw_db) if max_amp else None

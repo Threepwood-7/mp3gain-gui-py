@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
-from pathlib import Path
 import sys
 import time
+from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
 import pytest
@@ -12,7 +12,9 @@ import pytest
 def _load_module() -> ModuleType:
     repo_root = Path(__file__).resolve().parents[2]
     script_path = repo_root / "scripts" / "run_normalize.py"
-    spec = importlib.util.spec_from_file_location("run_normalize_for_tests", script_path)
+    spec = importlib.util.spec_from_file_location(
+        "run_normalize_for_tests", script_path
+    )
     if spec is None or spec.loader is None:
         raise RuntimeError("Unable to load run_normalize.py module for tests.")
     module = importlib.util.module_from_spec(spec)
@@ -52,7 +54,9 @@ def test_parse_analysis_mp3_gain_fails_on_malformed_output() -> None:
         module._parse_analysis_mp3_gain(output, target_file=target)
 
 
-def test_process_file_runs_analyze_then_apply_and_skips_zero(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_process_file_runs_analyze_then_apply_and_skips_zero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     module = _load_module()
     target = Path(r"c:\tmp\audio\sample.mp3")
     env: dict[str, str] = {}

@@ -71,7 +71,9 @@ def main() -> int:
         "original": _snapshot_for(original_dir),
         "reference_89db": _snapshot_for(reference_dir),
     }
-    output_path.write_text(json.dumps(snapshot, indent=2, sort_keys=True), encoding="utf-8")
+    output_path.write_text(
+        json.dumps(snapshot, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
     original_count = len(snapshot["original"]["files"])  # type: ignore[index]
     reference_count = len(snapshot["reference_89db"]["files"])  # type: ignore[index]

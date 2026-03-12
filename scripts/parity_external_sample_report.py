@@ -114,12 +114,16 @@ def _normalize_file_map(files: list[Path]) -> dict[str, Path]:
     return {path.name: path for path in files}
 
 
-def _select_sample_names(common_names: list[str], *, sample_size: int, seed: int) -> list[str]:
+def _select_sample_names(
+    common_names: list[str], *, sample_size: int, seed: int
+) -> list[str]:
     selected = random.Random(seed).sample(common_names, sample_size)
     return sorted(selected, key=str.lower)
 
 
-def _spot_hashes(file_map: dict[str, Path], sample_names: list[str], count: int) -> dict[str, str]:
+def _spot_hashes(
+    file_map: dict[str, Path], sample_names: list[str], count: int
+) -> dict[str, str]:
     names = sample_names[:count]
     return {name: sha256_file(file_map[name]) for name in names}
 
@@ -136,7 +140,9 @@ def _parallel_copy(tasks: list[tuple[Path, Path]], jobs: int) -> dict[str, str]:
 
     max_workers = min(max(1, jobs), len(tasks))
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_map = {executor.submit(_copy_one, src, dst): src.name for src, dst in tasks}
+        future_map = {
+            executor.submit(_copy_one, src, dst): src.name for src, dst in tasks
+        }
         for future in as_completed(future_map):
             name, copied_hash = future.result()
             copied_hashes[name] = copied_hash
@@ -163,13 +169,18 @@ def _autosize(ws: Worksheet) -> None:
         column_cells = list(column)
         if not column_cells:
             continue
-        max_len = max(len(str(cell.value)) if cell.value is not None else 0 for cell in column_cells)
+        max_len = max(
+            len(str(cell.value)) if cell.value is not None else 0
+            for cell in column_cells
+        )
         col_letter = column_cells[0].column_letter
         ws.column_dimensions[col_letter].width = min(80, max(12, max_len + 2))
 
 
 def _apply_status_fills(ws: Worksheet) -> None:
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+    for row in ws.iter_rows(
+        min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column
+    ):
         for cell in row:
             if cell.value == "PASS":
                 cell.fill = PASS_FILL
@@ -222,7 +233,9 @@ def _flatten_tag_rows(tag_mismatches: object) -> list[tuple[str, str, str, str, 
     return rows
 
 
-def _flatten_table_rows(table_mismatches: object) -> list[tuple[str, str, str, str, str]]:
+def _flatten_table_rows(
+    table_mismatches: object,
+) -> list[tuple[str, str, str, str, str]]:
     rows: list[tuple[str, str, str, str, str]] = []
     if not isinstance(table_mismatches, dict):
         return rows
@@ -312,7 +325,10 @@ def _write_excel_report(
         ("selected_common_files", len(run_report.get("selected_files", []))),
         ("reference_extra_files", len(run_report.get("extra_in_reference", []))),
         ("original_missing_files", len(run_report.get("missing_in_reference", []))),
-        ("source_files_unchanged", _status(bool(run_report.get("spot_check_unchanged", False)))),
+        (
+            "source_files_unchanged",
+            _status(bool(run_report.get("spot_check_unchanged", False))),
+        ),
     ]
     for key, value in summary_rows:
         summary_ws.append([key, value])
@@ -356,8 +372,17 @@ def _write_excel_report(
                     filename,
                     _status(bool(item.get("size_match", False))),
                     _status(bool(item.get("hash_match", False))),
-                    _status(bool(item.get("global_gain_ok", "first_global_gain_mismatch" not in item))),
-                    _status(bool(item.get("container_ok", item.get("id3v1_match", False)))),
+                    _status(
+                        bool(
+                            item.get(
+                                "global_gain_ok",
+                                "first_global_gain_mismatch" not in item,
+                            )
+                        )
+                    ),
+                    _status(
+                        bool(item.get("container_ok", item.get("id3v1_match", False)))
+                    ),
                     _status(bool(item.get("id3v1_match", False))),
                     item.get("reference_size", ""),
                     item.get("codex_size", ""),
@@ -414,18 +439,28 @@ def main() -> int:
     source_reference_names = set(source_reference_map)
 
     common_names = sorted(source_original_names & source_reference_names, key=str.lower)
-    missing_in_reference = sorted(source_original_names - source_reference_names, key=str.lower)
-    extra_in_reference = sorted(source_reference_names - source_original_names, key=str.lower)
+    missing_in_reference = sorted(
+        source_original_names - source_reference_names, key=str.lower
+    )
+    extra_in_reference = sorted(
+        source_reference_names - source_original_names, key=str.lower
+    )
 
     if len(common_names) < sample_size:
         raise RuntimeError(
             f"Not enough common files for sample_size={sample_size}: common={len(common_names)}"
         )
 
-    selected_names = _select_sample_names(common_names, sample_size=sample_size, seed=seed)
+    selected_names = _select_sample_names(
+        common_names, sample_size=sample_size, seed=seed
+    )
 
-    pre_spot_original = _spot_hashes(source_original_map, selected_names, DEFAULT_SPOT_CHECK_COUNT)
-    pre_spot_reference = _spot_hashes(source_reference_map, selected_names, DEFAULT_SPOT_CHECK_COUNT)
+    pre_spot_original = _spot_hashes(
+        source_original_map, selected_names, DEFAULT_SPOT_CHECK_COUNT
+    )
+    pre_spot_reference = _spot_hashes(
+        source_reference_map, selected_names, DEFAULT_SPOT_CHECK_COUNT
+    )
 
     _ensure_clean_dir(sample_workspace)
     workspace_original_dir.mkdir(parents=True, exist_ok=True)
@@ -482,10 +517,15 @@ def main() -> int:
     if not isinstance(compare_report, dict):
         raise RuntimeError("parity_compare_report.json is not an object.")
 
-    post_spot_original = _spot_hashes(source_original_map, selected_names, DEFAULT_SPOT_CHECK_COUNT)
-    post_spot_reference = _spot_hashes(source_reference_map, selected_names, DEFAULT_SPOT_CHECK_COUNT)
+    post_spot_original = _spot_hashes(
+        source_original_map, selected_names, DEFAULT_SPOT_CHECK_COUNT
+    )
+    post_spot_reference = _spot_hashes(
+        source_reference_map, selected_names, DEFAULT_SPOT_CHECK_COUNT
+    )
     spot_check_unchanged = (
-        pre_spot_original == post_spot_original and pre_spot_reference == post_spot_reference
+        pre_spot_original == post_spot_original
+        and pre_spot_reference == post_spot_reference
     )
 
     created_at = datetime.now(UTC)
@@ -543,10 +583,16 @@ def main() -> int:
         json.dumps(run_report, indent=2, sort_keys=True),
         encoding="utf-8",
     )
-    _write_excel_report(compare_report=compare_report, run_report=run_report, output_path=external_excel_path)
+    _write_excel_report(
+        compare_report=compare_report,
+        run_report=run_report,
+        output_path=external_excel_path,
+    )
 
     print(f"Sample workspace prepared: {sample_workspace}")
-    print(f"Common files={len(common_names)} selected={len(selected_names)} seed={seed}")
+    print(
+        f"Common files={len(common_names)} selected={len(selected_names)} seed={seed}"
+    )
     print(f"Extra in reference (ignored for sampling): {len(extra_in_reference)}")
     print(f"Original/source spot-check unchanged: {_status(spot_check_unchanged)}")
     print(f"Run report: {external_run_path}")

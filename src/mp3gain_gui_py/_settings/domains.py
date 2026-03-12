@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 from threep_commons.settings import SettingsDomainBase
+
 from . import normalize as _norm
 from .registry import SettingsRegistry
 
 
 class UiSettingsDomain(SettingsDomainBase, SettingsRegistry):
-
     @property
     def target_volume_db(self) -> float:
         return _norm.normalize_float(
-            self._storage.value(self.TARGET_VOLUME_DB_KEY, self.DEFAULT_TARGET_VOLUME_DB),
+            self._storage.value(
+                self.TARGET_VOLUME_DB_KEY, self.DEFAULT_TARGET_VOLUME_DB
+            ),
             self.DEFAULT_TARGET_VOLUME_DB,
         )
 
@@ -36,7 +38,9 @@ class UiSettingsDomain(SettingsDomainBase, SettingsRegistry):
     @property
     def stored_tag_policy(self) -> str:
         raw = _norm.normalize_str(
-            self._storage.value(self.STORED_TAG_POLICY_KEY, self.DEFAULT_STORED_TAG_POLICY),
+            self._storage.value(
+                self.STORED_TAG_POLICY_KEY, self.DEFAULT_STORED_TAG_POLICY
+            ),
             self.DEFAULT_STORED_TAG_POLICY,
         )
         if raw in self.ALLOWED_STORED_TAG_POLICIES:
@@ -94,7 +98,9 @@ class UiSettingsDomain(SettingsDomainBase, SettingsRegistry):
     @property
     def show_file_progress(self) -> bool:
         return _norm.normalize_bool(
-            self._storage.value(self.SHOW_FILE_PROGRESS_KEY, self.DEFAULT_SHOW_FILE_PROGRESS)
+            self._storage.value(
+                self.SHOW_FILE_PROGRESS_KEY, self.DEFAULT_SHOW_FILE_PROGRESS
+            )
         )
 
     @show_file_progress.setter
@@ -113,7 +119,6 @@ class UiSettingsDomain(SettingsDomainBase, SettingsRegistry):
 
 
 class OpsSettingsDomain(SettingsDomainBase, SettingsRegistry):
-
     @property
     def wrap_gain(self) -> bool:
         return _norm.normalize_bool(
@@ -159,12 +164,9 @@ class OpsSettingsDomain(SettingsDomainBase, SettingsRegistry):
 
 
 class SessionSettingsDomain(SettingsDomainBase, SettingsRegistry):
-
     @property
     def last_add_files_dir(self) -> str:
-        return _norm.normalize_str(
-            self._storage.value(self.LAST_ADD_FILES_DIR_KEY, "")
-        )
+        return _norm.normalize_str(self._storage.value(self.LAST_ADD_FILES_DIR_KEY, ""))
 
     @last_add_files_dir.setter
     def last_add_files_dir(self, value: str) -> None:
@@ -182,9 +184,7 @@ class SessionSettingsDomain(SettingsDomainBase, SettingsRegistry):
 
     @property
     def window_geometry(self) -> bytes:
-        return _norm.normalize_bytes(
-            self._storage.value(self.WINDOW_GEOMETRY_KEY, b"")
-        )
+        return _norm.normalize_bytes(self._storage.value(self.WINDOW_GEOMETRY_KEY, b""))
 
     @window_geometry.setter
     def window_geometry(self, value: bytes) -> None:

@@ -49,8 +49,7 @@ class Runner:
         proc = subprocess.run(
             cmd,
             cwd=str(cwd),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             shell=False,
             check=False,
         )
@@ -138,7 +137,9 @@ def main() -> int:
 
     all_mp3 = [p for p in source_dir.rglob("*.mp3") if p.is_file()]
     if len(all_mp3) < args.pick:
-        raise SystemExit(f"Need at least {args.pick} mp3 files, found {len(all_mp3)} in {source_dir}")
+        raise SystemExit(
+            f"Need at least {args.pick} mp3 files, found {len(all_mp3)} in {source_dir}"
+        )
 
     rng = random.Random(args.seed) if args.seed is not None else random.SystemRandom()
     selected = rng.sample(all_mp3, args.pick)
@@ -219,7 +220,7 @@ def main() -> int:
 
         file_args = [str((work_dir / sf.name).resolve()) for sf in seed_files]
 
-        c_cmd = [str(c_exe)] + args_list + file_args
+        c_cmd = [str(c_exe), *args_list, *file_args]
         c_res = runner.run(c_cmd, cwd=repo_root)
 
         (scen_root / "c_stdout.bin").write_bytes(c_res["stdout"])
@@ -235,7 +236,15 @@ def main() -> int:
             shutil.copy2(sf, dst)
             _clear_readonly(dst)
 
-        py_cmd = ["hatch", "run", "python", "-m", "mp3gain_gui_py.legacy_cli"] + args_list + file_args
+        py_cmd = [
+            "hatch",
+            "run",
+            "python",
+            "-m",
+            "mp3gain_gui_py.legacy_cli",
+            *args_list,
+            *file_args,
+        ]
         py_res = runner.run(py_cmd, cwd=repo_root)
 
         (scen_root / "py_stdout.bin").write_bytes(py_res["stdout"])
@@ -279,7 +288,9 @@ def main() -> int:
                 "py_returncode": py_res["returncode"],
                 "c_elapsed_s": c_res["elapsed_s"],
                 "py_elapsed_s": py_res["elapsed_s"],
-                "py_vs_c_slowdown": (py_res["elapsed_s"] / c_res["elapsed_s"]) if c_res["elapsed_s"] > 0 else None,
+                "py_vs_c_slowdown": (py_res["elapsed_s"] / c_res["elapsed_s"])
+                if c_res["elapsed_s"] > 0
+                else None,
                 "output_exact_match": output_exact,
                 "output_normalized_match": output_norm,
                 "byte_exact_all_files": all_equal,
@@ -313,17 +324,27 @@ def main() -> int:
             str(prof_file),
             "-m",
             "mp3gain_gui_py.legacy_cli",
-        ] + profile_args + [str(work_file.resolve())]
+            *profile_args,
+            str(work_file.resolve()),
+        ]
 
         profile_res = runner.run(profile_cmd, cwd=repo_root)
 
         cum_sio = io.StringIO()
-        pstats.Stats(str(prof_file), stream=cum_sio).sort_stats("cumulative").print_stats(30)
-        (pdir / "cumulative_top30.txt").write_text(cum_sio.getvalue(), encoding="utf-8", newline="\n")
+        pstats.Stats(str(prof_file), stream=cum_sio).sort_stats(
+            "cumulative"
+        ).print_stats(30)
+        (pdir / "cumulative_top30.txt").write_text(
+            cum_sio.getvalue(), encoding="utf-8", newline="\n"
+        )
 
         tot_sio = io.StringIO()
-        pstats.Stats(str(prof_file), stream=tot_sio).sort_stats("tottime").print_stats(30)
-        (pdir / "tottime_top30.txt").write_text(tot_sio.getvalue(), encoding="utf-8", newline="\n")
+        pstats.Stats(str(prof_file), stream=tot_sio).sort_stats("tottime").print_stats(
+            30
+        )
+        (pdir / "tottime_top30.txt").write_text(
+            tot_sio.getvalue(), encoding="utf-8", newline="\n"
+        )
 
         (pdir / "stdout.bin").write_bytes(profile_res["stdout"])
         (pdir / "stderr.bin").write_bytes(profile_res["stderr"])
@@ -343,7 +364,9 @@ def main() -> int:
         )
 
     report_path = run_dir / "report.json"
-    report_path.write_text(json.dumps(results, indent=2), encoding="utf-8", newline="\n")
+    report_path.write_text(
+        json.dumps(results, indent=2), encoding="utf-8", newline="\n"
+    )
 
     print(f"RUN_DIR={run_dir}")
     print(f"REPORT={report_path}")

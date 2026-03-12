@@ -3,11 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QMainWindow
-from pytestqt.qtbot import QtBot
 
 from mp3gain_gui_py.ui.window.actions import WindowActionsCoordinator
+
+if TYPE_CHECKING:
+    from pytestqt.qtbot import QtBot
 
 
 class _DummyModel:

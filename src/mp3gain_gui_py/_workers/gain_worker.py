@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .._legacy_exact.math import db_to_legacy_steps
 from .process_tasks import album_group_gain_task, gain_file_task
@@ -41,7 +41,9 @@ class GainWorker:
             groups.setdefault(str(path.parent), []).append(path)
         return groups
 
-    def _compute_forced_album_steps(self, *, req: WorkerRequest, paths: list[Path]) -> tuple[dict[Path, int], bool]:
+    def _compute_forced_album_steps(
+        self, *, req: WorkerRequest, paths: list[Path]
+    ) -> tuple[dict[Path, int], bool]:
         groups = req.album_groups if req.album_groups else self._group_by_parent(paths)
         group_items = list(groups.values())
         if not group_items:
@@ -51,8 +53,12 @@ class GainWorker:
         final_steps_by_path: dict[Path, int] = {}
         step_offset = db_to_legacy_steps(req.target_db - _LEGACY_TARGET_DB)
 
-        group_futures: dict[Future[tuple[tuple[str, ...], float | None]], tuple[Path, ...]] = {}
-        with ProcessPoolExecutor(max_workers=self._max_workers(len(group_items))) as group_executor:
+        group_futures: dict[
+            Future[tuple[tuple[str, ...], float | None]], tuple[Path, ...]
+        ] = {}
+        with ProcessPoolExecutor(
+            max_workers=self._max_workers(len(group_items))
+        ) as group_executor:
             for group_paths in group_items:
                 if self._bridge.is_cancelled:
                     cancelled = True

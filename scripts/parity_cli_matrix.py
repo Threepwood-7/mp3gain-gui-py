@@ -8,7 +8,6 @@ import os
 import shutil
 import stat
 import subprocess
-import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -48,9 +47,19 @@ class _Case:
 
 
 CASES: tuple[_Case, ...] = (
-    _Case(name="info_version", args=("/v",), mutates=False, gating=False, uses_files=False),
-    _Case(name="info_help_h", args=("/h",), mutates=False, gating=False, uses_files=False),
-    _Case(name="info_help_qmark", args=("/?",), mutates=False, gating=False, uses_files=False),
+    _Case(
+        name="info_version", args=("/v",), mutates=False, gating=False, uses_files=False
+    ),
+    _Case(
+        name="info_help_h", args=("/h",), mutates=False, gating=False, uses_files=False
+    ),
+    _Case(
+        name="info_help_qmark",
+        args=("/?",),
+        mutates=False,
+        gating=False,
+        uses_files=False,
+    ),
     _Case(
         name="info_help_wrap",
         args=("/?", "wrap"),
@@ -58,17 +67,69 @@ CASES: tuple[_Case, ...] = (
         gating=False,
         uses_files=False,
     ),
-    _Case(name="scan_qo", args=("/q", "/o"), mutates=False, gating=True, table_case=True),
-    _Case(name="scan_qo_sc", args=("/q", "/o", "/s", "c"), mutates=False, gating=True, table_case=True),
-    _Case(name="scan_qo_x", args=("/q", "/o", "/x"), mutates=False, gating=True, table_case=True),
-    _Case(name="scan_qo_sr", args=("/q", "/o", "/s", "r"), mutates=False, gating=True, table_case=True),
-    _Case(name="scan_qo_ss", args=("/q", "/o", "/s", "s"), mutates=False, gating=True, table_case=True),
-    _Case(name="scan_qo_e", args=("/q", "/o", "/e"), mutates=False, gating=True, table_case=True),
+    _Case(
+        name="scan_qo", args=("/q", "/o"), mutates=False, gating=True, table_case=True
+    ),
+    _Case(
+        name="scan_qo_sc",
+        args=("/q", "/o", "/s", "c"),
+        mutates=False,
+        gating=True,
+        table_case=True,
+    ),
+    _Case(
+        name="scan_qo_x",
+        args=("/q", "/o", "/x"),
+        mutates=False,
+        gating=True,
+        table_case=True,
+    ),
+    _Case(
+        name="scan_qo_sr",
+        args=("/q", "/o", "/s", "r"),
+        mutates=False,
+        gating=True,
+        table_case=True,
+    ),
+    _Case(
+        name="scan_qo_ss",
+        args=("/q", "/o", "/s", "s"),
+        mutates=False,
+        gating=True,
+        table_case=True,
+    ),
+    _Case(
+        name="scan_qo_e",
+        args=("/q", "/o", "/e"),
+        mutates=False,
+        gating=True,
+        table_case=True,
+    ),
     _Case(name="track_rc", args=("/q", "/r", "/c"), mutates=True, gating=True),
-    _Case(name="track_rc_ss", args=("/q", "/r", "/c", "/s", "s"), mutates=True, gating=True),
-    _Case(name="track_rc_sr", args=("/q", "/r", "/c", "/s", "r"), mutates=True, gating=True),
-    _Case(name="track_rc_d15", args=("/q", "/r", "/c", "/d", "1.5"), mutates=True, gating=True),
-    _Case(name="track_rc_m1", args=("/q", "/r", "/c", "/m", "1"), mutates=True, gating=True),
+    _Case(
+        name="track_rc_ss",
+        args=("/q", "/r", "/c", "/s", "s"),
+        mutates=True,
+        gating=True,
+    ),
+    _Case(
+        name="track_rc_sr",
+        args=("/q", "/r", "/c", "/s", "r"),
+        mutates=True,
+        gating=True,
+    ),
+    _Case(
+        name="track_rc_d15",
+        args=("/q", "/r", "/c", "/d", "1.5"),
+        mutates=True,
+        gating=True,
+    ),
+    _Case(
+        name="track_rc_m1",
+        args=("/q", "/r", "/c", "/m", "1"),
+        mutates=True,
+        gating=True,
+    ),
     _Case(name="track_rc_w", args=("/q", "/r", "/c", "/w"), mutates=True, gating=True),
     _Case(name="track_rk", args=("/q", "/r", "/k"), mutates=True, gating=True),
     _Case(name="track_rc_t", args=("/q", "/r", "/c", "/t"), mutates=True, gating=True),
@@ -90,7 +151,9 @@ CASES: tuple[_Case, ...] = (
     ),
     _Case(name="direct_g4", args=("/q", "/g", "4"), mutates=True, gating=True),
     _Case(name="direct_l0_3", args=("/q", "/l", "0", "3"), mutates=True, gating=True),
-    _Case(name="direct_l1_neg3", args=("/q", "/l", "1", "-3"), mutates=True, gating=True),
+    _Case(
+        name="direct_l1_neg3", args=("/q", "/l", "1", "-3"), mutates=True, gating=True
+    ),
     _Case(
         name="undo_after_apply",
         args=("/q", "/u"),
@@ -98,8 +161,12 @@ CASES: tuple[_Case, ...] = (
         gating=True,
         setup_args=MUTATING_SETUP_ARGS,
     ),
-    _Case(name="tags_sa_sd", args=("/q", "/s", "a", "/s", "d"), mutates=True, gating=True),
-    _Case(name="tags_si_sd", args=("/q", "/s", "i", "/s", "d"), mutates=True, gating=True),
+    _Case(
+        name="tags_sa_sd", args=("/q", "/s", "a", "/s", "d"), mutates=True, gating=True
+    ),
+    _Case(
+        name="tags_si_sd", args=("/q", "/s", "i", "/s", "d"), mutates=True, gating=True
+    ),
 )
 
 
@@ -160,7 +227,9 @@ def _copy_writable(src: Path, dst: Path) -> None:
 
 def _run_command(command: list[str], *, cwd: Path) -> dict[str, Any]:
     started = time.perf_counter()
-    completed = subprocess.run(command, cwd=cwd, check=False, capture_output=True, text=True)
+    completed = subprocess.run(
+        command, cwd=cwd, check=False, capture_output=True, text=True
+    )
     return {
         "command": command,
         "exit_code": completed.returncode,
@@ -234,7 +303,9 @@ def _require_runtime_dependencies(repo_root: Path) -> None:
         text=True,
     )
     if hatch_check.returncode != 0:
-        raise RuntimeError("Missing 'hatch' executable in PATH; parity harness requires hatch run.")
+        raise RuntimeError(
+            "Missing 'hatch' executable in PATH; parity harness requires hatch run."
+        )
 
     dep_check = subprocess.run(
         [
@@ -330,7 +401,9 @@ def _run_case_for_file(
     table_match = True
     table_diff: dict[str, Any] = {}
     if case.table_case:
-        table_match, table_diff = _compare_table(oracle_run["stdout"], python_run["stdout"])
+        table_match, table_diff = _compare_table(
+            oracle_run["stdout"], python_run["stdout"]
+        )
 
     non_mutating_ok = True
     if source_file is not None and not case.mutates and input_sha256 is not None:
@@ -443,7 +516,9 @@ def _write_xlsx(
     ws_cases = wb.create_sheet("Cases")
     ws_cases.append(["Case", "Runs", "Pass", "Fail", "Gating"])
     for row in case_rows:
-        ws_cases.append([row["case"], row["runs"], row["pass"], row["fail"], row["gating"]])
+        ws_cases.append(
+            [row["case"], row["runs"], row["pass"], row["fail"], row["gating"]]
+        )
 
     ws_per_file = wb.create_sheet("PerFile")
     ws_per_file.append(
@@ -541,7 +616,9 @@ def main() -> int:
     run_path = args.snapshot_dir / f"parity_cli_full_run_{run_slug}.json"
     report_xlsx = args.snapshot_dir / f"parity_cli_full_report_{run_slug}.xlsx"
 
-    print(f"Copy progress: preparing {total_tasks} tasks from {len(files)} source files")
+    print(
+        f"Copy progress: preparing {total_tasks} tasks from {len(files)} source files"
+    )
     print(f"Execution progress: 0/{total_tasks} pass=0 fail=0 ETA=? jobs={jobs}")
 
     tasks: list[tuple[_Case, Path | None]] = []
@@ -583,7 +660,7 @@ def main() -> int:
                 for case, source_file in tasks
             }
 
-            for future, (case, source_file) in future_map.items():
+            for _future, (case, source_file) in future_map.items():
                 _write_progress_event(
                     progress_handle,
                     {
@@ -631,7 +708,9 @@ def main() -> int:
                 )
                 if fail_count > 0 and fail_count % 5 == 0:
                     snapshot = failure_snapshots[-3:]
-                    print(f"Failure snapshot ({fail_count} fails): {json.dumps(snapshot, sort_keys=True)}")
+                    print(
+                        f"Failure snapshot ({fail_count} fails): {json.dumps(snapshot, sort_keys=True)}"
+                    )
                     _write_progress_event(
                         progress_handle,
                         {
@@ -664,7 +743,13 @@ def main() -> int:
     for item in results:
         row = per_case.setdefault(
             item["case"],
-            {"case": item["case"], "runs": 0, "pass": 0, "fail": 0, "gating": item["gating"]},
+            {
+                "case": item["case"],
+                "runs": 0,
+                "pass": 0,
+                "fail": 0,
+                "gating": item["gating"],
+            },
         )
         row["runs"] += 1
         if item["case_pass"]:
@@ -693,7 +778,9 @@ def main() -> int:
         "summary": summary,
         "results": results,
     }
-    results_path.write_text(json.dumps(results_payload, indent=2, sort_keys=True), encoding="utf-8")
+    results_path.write_text(
+        json.dumps(results_payload, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
     run_payload = {
         "summary": summary,
@@ -710,7 +797,9 @@ def main() -> int:
         "source_hash_before": source_hash_before,
         "source_hash_after": source_hash_after,
     }
-    run_path.write_text(json.dumps(run_payload, indent=2, sort_keys=True), encoding="utf-8")
+    run_path.write_text(
+        json.dumps(run_payload, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
     _write_xlsx(
         summary=summary,

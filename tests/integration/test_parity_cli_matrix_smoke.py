@@ -25,7 +25,9 @@ def test_parity_cli_matrix_smoke_external() -> None:
         pytest.skip(f"Missing source directory: {source}")
 
     before = sorted(source.glob("*.mp3"))
-    before_hashes = {path.name: sha256(path.read_bytes()).hexdigest() for path in before}
+    before_hashes = {
+        path.name: sha256(path.read_bytes()).hexdigest() for path in before
+    }
 
     command = [
         "hatch",
@@ -39,7 +41,9 @@ def test_parity_cli_matrix_smoke_external() -> None:
         "--snapshot-dir",
         str(snapshot),
     ]
-    completed = subprocess.run(command, cwd=repo_root, check=False, text=True, capture_output=True)
+    completed = subprocess.run(
+        command, cwd=repo_root, check=False, text=True, capture_output=True
+    )
     assert completed.returncode in {0, 1}
 
     after = sorted(source.glob("*.mp3"))

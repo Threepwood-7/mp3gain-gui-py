@@ -133,7 +133,9 @@ def first_byte_mismatch(reference: Path, codex: Path) -> dict[str, object] | Non
             "longer_file": longer,
             "reference_size": len(ref),
             "codex_size": len(cod),
-            "semantic_bucket": _semantic_bucket(ref if longer == "reference" else cod, shared),
+            "semantic_bucket": _semantic_bucket(
+                ref if longer == "reference" else cod, shared
+            ),
         }
     return None
 
@@ -196,7 +198,9 @@ def _iter_frame_global_gain(data: bytes) -> list[tuple[int, list[int]]]:
     return rows
 
 
-def first_global_gain_mismatch(reference: Path, codex: Path) -> dict[str, object] | None:
+def first_global_gain_mismatch(
+    reference: Path, codex: Path
+) -> dict[str, object] | None:
     """Return first frame-global_gain mismatch between oracle and codex outputs.
 
     Legacy pointer: LEGACY_PTR:PARITY_COMPARE_STRICT.
@@ -250,18 +254,28 @@ def _parse_float(text: str) -> float | None:
         return None
 
 
-def _is_tolerated_tag_diff(key: str, reference: str, codex: str, *, strict: bool) -> bool:
+def _is_tolerated_tag_diff(
+    key: str, reference: str, codex: str, *, strict: bool
+) -> bool:
     if strict:
         return False
     upper = key.upper()
     if upper.startswith("REPLAYGAIN_") and upper.endswith("_GAIN"):
         ref_db = _parse_gain_db(reference)
         cod_db = _parse_gain_db(codex)
-        return ref_db is not None and cod_db is not None and abs(ref_db - cod_db) <= TRACK_GAIN_TOLERANCE_DB
+        return (
+            ref_db is not None
+            and cod_db is not None
+            and abs(ref_db - cod_db) <= TRACK_GAIN_TOLERANCE_DB
+        )
     if upper.startswith("REPLAYGAIN_") and upper.endswith("_PEAK"):
         ref_peak = _parse_float(reference)
         cod_peak = _parse_float(codex)
-        return ref_peak is not None and cod_peak is not None and abs(ref_peak - cod_peak) <= PEAK_TOLERANCE
+        return (
+            ref_peak is not None
+            and cod_peak is not None
+            and abs(ref_peak - cod_peak) <= PEAK_TOLERANCE
+        )
     return False
 
 
@@ -286,13 +300,19 @@ def _dict_diff(
     }
 
 
-def _is_tolerated_table_diff(key: str, reference: str, codex: str, *, strict: bool) -> bool:
+def _is_tolerated_table_diff(
+    key: str, reference: str, codex: str, *, strict: bool
+) -> bool:
     if strict:
         return False
     if key in {"db_gain", "album_db_gain"}:
         ref_db = _parse_float(reference)
         cod_db = _parse_float(codex)
-        return ref_db is not None and cod_db is not None and abs(ref_db - cod_db) <= TRACK_GAIN_TOLERANCE_DB
+        return (
+            ref_db is not None
+            and cod_db is not None
+            and abs(ref_db - cod_db) <= TRACK_GAIN_TOLERANCE_DB
+        )
     if key in {"max_amplitude", "album_max_amplitude"}:
         ref_amp = _parse_float(reference)
         cod_amp = _parse_float(codex)
@@ -437,7 +457,9 @@ def _parse_args() -> Namespace:
 def _run_step(command: list[str], *, cwd: Path, allow_failure: bool = False) -> int:
     completed = subprocess.run(command, cwd=cwd, text=True, check=False)
     if completed.returncode != 0 and not allow_failure:
-        raise RuntimeError(f"Command failed ({completed.returncode}): {' '.join(command)}")
+        raise RuntimeError(
+            f"Command failed ({completed.returncode}): {' '.join(command)}"
+        )
     return completed.returncode
 
 
@@ -486,7 +508,9 @@ def _run_full_pipeline(
         build_cmd.append("--force-rebuild")
     build_rc = _run_step(build_cmd, cwd=repo_root, allow_failure=True)
     if build_rc != 0:
-        print(f"WARN parity build step returned {build_rc}; continuing to compare generated outputs.")
+        print(
+            f"WARN parity build step returned {build_rc}; continuing to compare generated outputs."
+        )
 
 
 def main() -> int:
@@ -564,12 +588,35 @@ def main() -> int:
     global_gain_fail = False
     container_fail = False
     metadata_fail = False
-    suite_tag_fail: dict[str, set[str]] = {"numeric_1_7": set(), "m_suite": set(), "external_or_other": set()}
-    suite_table_fail: dict[str, set[str]] = {"numeric_1_7": set(), "m_suite": set(), "external_or_other": set()}
+    suite_tag_fail: dict[str, set[str]] = {
+        "numeric_1_7": set(),
+        "m_suite": set(),
+        "external_or_other": set(),
+    }
+    suite_table_fail: dict[str, set[str]] = {
+        "numeric_1_7": set(),
+        "m_suite": set(),
+        "external_or_other": set(),
+    }
     suite_counts: dict[str, dict[str, int]] = {
-        "numeric_1_7": {"files": 0, "global_gain_fail": 0, "container_fail": 0, "hash_fail": 0},
-        "m_suite": {"files": 0, "global_gain_fail": 0, "container_fail": 0, "hash_fail": 0},
-        "external_or_other": {"files": 0, "global_gain_fail": 0, "container_fail": 0, "hash_fail": 0},
+        "numeric_1_7": {
+            "files": 0,
+            "global_gain_fail": 0,
+            "container_fail": 0,
+            "hash_fail": 0,
+        },
+        "m_suite": {
+            "files": 0,
+            "global_gain_fail": 0,
+            "container_fail": 0,
+            "hash_fail": 0,
+        },
+        "external_or_other": {
+            "files": 0,
+            "global_gain_fail": 0,
+            "container_fail": 0,
+            "hash_fail": 0,
+        },
     }
 
     for name in common_names:
@@ -616,7 +663,9 @@ def main() -> int:
             if key in reference_map or key in codex_map:
                 suite_table_fail[_suite_name(key)].add(key)
             continue
-        row_diff = _table_row_diff(reference_table[key], codex_table[key], strict=args.strict)
+        row_diff = _table_row_diff(
+            reference_table[key], codex_table[key], strict=args.strict
+        )
         if (
             row_diff["missing_in_codex"]
             or row_diff["missing_in_reference"]
@@ -629,7 +678,9 @@ def main() -> int:
 
     summary: dict[str, object] = report["summary"]  # type: ignore[assignment]
     byte_identical_files = sum(
-        1 for v in file_report.values() if isinstance(v, dict) and v.get("hash_match") is True
+        1
+        for v in file_report.values()
+        if isinstance(v, dict) and v.get("hash_match") is True
     )
     summary["reference_files"] = len(reference_files)
     summary["codex_files"] = len(codex_files)
@@ -651,7 +702,9 @@ def main() -> int:
     audio_structure_ok = not file_set_mismatch and not global_gain_fail
     metadata_ok = not file_set_mismatch and not metadata_fail
     container_ok = not file_set_mismatch and not container_fail
-    byte_identity_ok = byte_identical_files == len(common_names) and not file_set_mismatch
+    byte_identity_ok = (
+        byte_identical_files == len(common_names) and not file_set_mismatch
+    )
     byte_identity_blocking = args.strict
     overall_ok = (
         audio_structure_ok
@@ -663,9 +716,7 @@ def main() -> int:
     statuses["audio_structure_parity"] = "PASS" if audio_structure_ok else "FAIL"
     statuses["metadata_parity"] = "PASS" if metadata_ok else "FAIL"
     statuses["container_parity"] = "PASS" if container_ok else "FAIL"
-    statuses["byte_identity"] = (
-        "PASS" if byte_identity_ok else "FAIL"
-    )
+    statuses["byte_identity"] = "PASS" if byte_identity_ok else "FAIL"
     summary["byte_identity_blocking"] = byte_identity_blocking
     summary["status"] = "PASS" if overall_ok else "FAIL"
     summary["suite_gates"] = {
@@ -696,7 +747,9 @@ def main() -> int:
             "table_fail": len(suite_table_fail[suite_name]),
         }
 
-    report_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    report_path.write_text(
+        json.dumps(report, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
     if not overall_ok:
         print(f"FAIL parity comparison: {report_path}")

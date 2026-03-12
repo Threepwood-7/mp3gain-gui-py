@@ -35,12 +35,12 @@ def _peek8_bits(data: bytearray, byte_off: int, bit_off: int) -> int:
 def _set8_bits(data: bytearray, byte_off: int, bit_off: int, value: int) -> None:
     """Write ``value`` (8 bits) into ``data`` at the given bit position."""
     # maskLeft[k]  keeps only the top k bits of the byte (k bits from MSB)
-    mask_left  = (0xFF00 >> bit_off) & 0xFF
+    mask_left = (0xFF00 >> bit_off) & 0xFF
     # maskRight[k] keeps only the bottom (8-k) bits of the byte
     mask_right = (0xFF >> bit_off) & 0xFF
 
-    v = (value & 0xFF) << (8 - bit_off)   # shift value into place in 16-bit word
-    data[byte_off]     = (data[byte_off]     & mask_left)  | (v >> 8)
+    v = (value & 0xFF) << (8 - bit_off)  # shift value into place in 16-bit word
+    data[byte_off] = (data[byte_off] & mask_left) | (v >> 8)
     data[byte_off + 1] = (data[byte_off + 1] & mask_right) | (v & 0xFF)
 
 
@@ -135,7 +135,9 @@ def apply_gain_change(
 
         # Recalculate CRC if the frame is CRC-protected and we changed something
         if changed and header.crc_protected:
-            _recalc_crc(data, pos, header.mpeg_version == 0x03, header.num_channels == 1)
+            _recalc_crc(
+                data, pos, header.mpeg_version == 0x03, header.num_channels == 1
+            )
 
         pos += header.frame_size_bytes
 
@@ -180,7 +182,9 @@ def _legacy_tmp_path(path: Path) -> Path:
     return path.with_name(name + ".TMP")
 
 
-def _replace_with_retry(tmp: Path, target: Path, *, retries: int = 5, delay_s: float = 0.05) -> None:
+def _replace_with_retry(
+    tmp: Path, target: Path, *, retries: int = 5, delay_s: float = 0.05
+) -> None:
     """Replace destination with bounded retries for transient Windows locks.
 
     Legacy pointer: LEGACY_PTR:MP3_TEMPFILE_REPLACE.
@@ -219,7 +223,7 @@ def undo_gain_change(
     if len(parts) != 3:
         raise ValueError(f"Invalid MP3GAIN_UNDO tag value: {undo_tag!r}")
 
-    left_delta = -int(parts[0])    # negate to undo
+    left_delta = -int(parts[0])  # negate to undo
     right_delta = -int(parts[1])
     # parts[2] is 'W' or 'N' — wrap mode is passed via the wrap param
 

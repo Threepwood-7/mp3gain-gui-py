@@ -128,12 +128,19 @@ class LegacyCBackend:
         analyzer_init.argtypes = [c_long]
         analyzer_init.restype = c_int
 
-        analyzer_reset_sample_frequency = dll.mp3g_backend_analyzer_reset_sample_frequency
+        analyzer_reset_sample_frequency = (
+            dll.mp3g_backend_analyzer_reset_sample_frequency
+        )
         analyzer_reset_sample_frequency.argtypes = [c_long]
         analyzer_reset_sample_frequency.restype = c_int
 
         analyzer_feed_f64 = dll.mp3g_backend_analyzer_feed_f64
-        analyzer_feed_f64.argtypes = [POINTER(c_double), POINTER(c_double), c_size_t, c_int]
+        analyzer_feed_f64.argtypes = [
+            POINTER(c_double),
+            POINTER(c_double),
+            c_size_t,
+            c_int,
+        ]
         analyzer_feed_f64.restype = c_int
 
         analyzer_get_title_gain = dll.mp3g_backend_analyzer_get_title_gain
@@ -213,10 +220,14 @@ class LegacyCBackend:
         try:
             return str(path).encode("mbcs")
         except UnicodeEncodeError as exc:
-            raise CBackendPathError(f"Path cannot be encoded for legacy C runtime: {path}") from exc
+            raise CBackendPathError(
+                f"Path cannot be encoded for legacy C runtime: {path}"
+            ) from exc
 
     def analyze_track_gain_and_peak(self, path: Path) -> tuple[float, float]:
-        gain_db, max_amp, _min_gain, _max_gain = self.scan_track_metrics(path, include_gain=True)
+        gain_db, max_amp, _min_gain, _max_gain = self.scan_track_metrics(
+            path, include_gain=True
+        )
         return gain_db, max_amp
 
     def scan_track_metrics(
@@ -241,15 +252,24 @@ class LegacyCBackend:
                 byref(max_gain),
             )
             if rc != 0:
-                raise CBackendError(self._read_last_error(default_message="scan file failed"))
-        return float(gain_db.value), float(max_amp.value), int(min_gain.value), int(max_gain.value)
+                raise CBackendError(
+                    self._read_last_error(default_message="scan file failed")
+                )
+        return (
+            float(gain_db.value),
+            float(max_amp.value),
+            int(min_gain.value),
+            int(max_gain.value),
+        )
 
     def begin_album_scan(self) -> None:
         with self._lock:
             self._fns.reset_error()
             rc = self._fns.album_scan_begin()
             if rc != 0:
-                raise CBackendError(self._read_last_error(default_message="album scan begin failed"))
+                raise CBackendError(
+                    self._read_last_error(default_message="album scan begin failed")
+                )
 
     def finish_album_scan(self) -> float:
         gain_db = c_double(0.0)
@@ -257,7 +277,9 @@ class LegacyCBackend:
             self._fns.reset_error()
             rc = self._fns.album_scan_finish(byref(gain_db))
             if rc != 0:
-                raise CBackendError(self._read_last_error(default_message="album scan finish failed"))
+                raise CBackendError(
+                    self._read_last_error(default_message="album scan finish failed")
+                )
         return float(gain_db.value)
 
     def apply_gain_file(
@@ -282,7 +304,9 @@ class LegacyCBackend:
                 1 if use_temp_file else 0,
             )
             if rc != 0:
-                raise CBackendError(self._read_last_error(default_message="apply gain failed"))
+                raise CBackendError(
+                    self._read_last_error(default_message="apply gain failed")
+                )
 
     @staticmethod
     def _tag_format_to_int(tag_format: str) -> int:
@@ -307,7 +331,9 @@ class LegacyCBackend:
             self._fns.reset_error()
             rc = self._fns.read_tags(path_bytes, ctypes.byref(out))
             if rc != 0:
-                raise CBackendError(self._read_last_error(default_message="read tags failed"))
+                raise CBackendError(
+                    self._read_last_error(default_message="read tags failed")
+                )
 
         if out.found == 0:
             return TagData(tag_format="none")
@@ -344,9 +370,13 @@ class LegacyCBackend:
         payload.have_album_gain = 1 if tags.album_gain_db is not None else 0
         payload.have_album_peak = 1 if tags.album_peak is not None else 0
         payload.have_undo = 1 if tags.has_undo else 0
-        payload.have_minmax_gain = 1 if (tags.min_gain is not None and tags.max_gain is not None) else 0
+        payload.have_minmax_gain = (
+            1 if (tags.min_gain is not None and tags.max_gain is not None) else 0
+        )
         payload.have_album_minmax_gain = (
-            1 if (tags.album_min_gain is not None and tags.album_max_gain is not None) else 0
+            1
+            if (tags.album_min_gain is not None and tags.album_max_gain is not None)
+            else 0
         )
         payload.track_gain = float(tags.track_gain_db or 0.0)
         payload.track_peak = float(tags.track_peak or 0.0)
@@ -369,16 +399,26 @@ class LegacyCBackend:
                 1 if preserve_timestamp else 0,
             )
             if rc != 0:
-                raise CBackendError(self._read_last_error(default_message="write tags failed"))
+                raise CBackendError(
+                    self._read_last_error(default_message="write tags failed")
+                )
 
-    def delete_tags(self, path: Path, *, tag_format: str | None, preserve_timestamp: bool) -> None:
+    def delete_tags(
+        self, path: Path, *, tag_format: str | None, preserve_timestamp: bool
+    ) -> None:
         path_bytes = self._encode_path(path)
-        fmt = TAG_FORMAT_NONE if tag_format is None else self._tag_format_to_int(tag_format)
+        fmt = (
+            TAG_FORMAT_NONE
+            if tag_format is None
+            else self._tag_format_to_int(tag_format)
+        )
         with self._lock:
             self._fns.reset_error()
             rc = self._fns.delete_tags(path_bytes, fmt, 1 if preserve_timestamp else 0)
             if rc != 0:
-                raise CBackendError(self._read_last_error(default_message="delete tags failed"))
+                raise CBackendError(
+                    self._read_last_error(default_message="delete tags failed")
+                )
 
 
 CBackendUnavailable = CBackendUnavailableError

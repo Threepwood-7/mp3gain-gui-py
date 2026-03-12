@@ -27,7 +27,9 @@ def test_parity_smoke_external() -> None:
 
     mode = os.environ.get("MP3GAIN_PARITY_MODE", "quick").strip().lower()
     if mode not in {"quick", "full"}:
-        pytest.fail(f"Invalid MP3GAIN_PARITY_MODE={mode!r}; expected 'quick' or 'full'.")
+        pytest.fail(
+            f"Invalid MP3GAIN_PARITY_MODE={mode!r}; expected 'quick' or 'full'."
+        )
 
     command = [sys.executable, "scripts/parity_compare.py", "--mode", mode]
 

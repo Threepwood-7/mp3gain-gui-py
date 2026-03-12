@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
-
-from _pytest.monkeypatch import MonkeyPatch
+from typing import TYPE_CHECKING
 
 import mp3gain_gui_py._workers.process_tasks as process_tasks_mod
 from mp3gain_gui_py._legacy_exact.math import db_to_legacy_steps
+
+if TYPE_CHECKING:
+    from _pytest.monkeypatch import MonkeyPatch
 
 
 class _DummyProcessor:
@@ -42,13 +44,17 @@ class _DummyProcessor:
         return SimpleNamespace(exit_code=0, message="")
 
 
-def test_gain_file_task_forced_track_normalize_uses_analysis_not_tags(monkeypatch: MonkeyPatch) -> None:
+def test_gain_file_task_forced_track_normalize_uses_analysis_not_tags(
+    monkeypatch: MonkeyPatch,
+) -> None:
     dummy = _DummyProcessor(analyzed_gain_db=3.010299956639812)
     monkeypatch.setattr(process_tasks_mod, "_get_processor", lambda: dummy)
     monkeypatch.setattr(
         process_tasks_mod,
         "read_tags",
-        lambda _path: (_ for _ in ()).throw(AssertionError("read_tags should not be called")),
+        lambda _path: (_ for _ in ()).throw(
+            AssertionError("read_tags should not be called")
+        ),
     )
 
     result = process_tasks_mod.gain_file_task(
@@ -66,7 +72,9 @@ def test_gain_file_task_forced_track_normalize_uses_analysis_not_tags(monkeypatc
     assert dummy.apply_steps_calls == [1]
 
 
-def test_gain_file_task_forced_track_zero_step_can_skip_apply(monkeypatch: MonkeyPatch) -> None:
+def test_gain_file_task_forced_track_zero_step_can_skip_apply(
+    monkeypatch: MonkeyPatch,
+) -> None:
     dummy = _DummyProcessor(analyzed_gain_db=0.0)
     monkeypatch.setattr(process_tasks_mod, "_get_processor", lambda: dummy)
 
@@ -85,7 +93,9 @@ def test_gain_file_task_forced_track_zero_step_can_skip_apply(monkeypatch: Monke
     assert dummy.apply_steps_calls == []
 
 
-def test_gain_file_task_forced_track_zero_step_can_apply(monkeypatch: MonkeyPatch) -> None:
+def test_gain_file_task_forced_track_zero_step_can_apply(
+    monkeypatch: MonkeyPatch,
+) -> None:
     dummy = _DummyProcessor(analyzed_gain_db=0.0)
     monkeypatch.setattr(process_tasks_mod, "_get_processor", lambda: dummy)
 
@@ -104,7 +114,9 @@ def test_gain_file_task_forced_track_zero_step_can_apply(monkeypatch: MonkeyPatc
     assert dummy.apply_steps_calls == [0]
 
 
-def test_gain_file_task_force_disabled_apply_track_uses_tags(monkeypatch: MonkeyPatch) -> None:
+def test_gain_file_task_force_disabled_apply_track_uses_tags(
+    monkeypatch: MonkeyPatch,
+) -> None:
     track_gain = 3.010299956639812
     dummy = _DummyProcessor(analyzed_gain_db=0.0)
     monkeypatch.setattr(process_tasks_mod, "_get_processor", lambda: dummy)
@@ -129,7 +141,9 @@ def test_gain_file_task_force_disabled_apply_track_uses_tags(monkeypatch: Monkey
     assert dummy.apply_steps_calls == [db_to_legacy_steps(track_gain)]
 
 
-def test_gain_file_task_forced_album_requires_group_steps(monkeypatch: MonkeyPatch) -> None:
+def test_gain_file_task_forced_album_requires_group_steps(
+    monkeypatch: MonkeyPatch,
+) -> None:
     dummy = _DummyProcessor(analyzed_gain_db=0.0)
     monkeypatch.setattr(process_tasks_mod, "_get_processor", lambda: dummy)
 

@@ -14,13 +14,15 @@ clip(Track) | Album Volume | Album Gain | clip(Album)):
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QPersistentModelIndex, Qt
 from PySide6.QtGui import QColor
 
 from .file_entry import FileEntry
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _HEADERS = [
     "Path\\File",
@@ -44,6 +46,7 @@ _COL_CLIP_ALBUM = 7
 
 _CLIP_YES = "Y"
 _RED = QColor(200, 0, 0)
+_DEFAULT_MODEL_INDEX = QModelIndex()
 
 
 class FileListModel(QAbstractTableModel):
@@ -57,12 +60,16 @@ class FileListModel(QAbstractTableModel):
 
     # ── Qt overrides ───────────────────────────────────────────────────────
 
-    def rowCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:  # noqa: B008
+    def rowCount(  # noqa: N802
+        self, parent: QModelIndex | QPersistentModelIndex = _DEFAULT_MODEL_INDEX
+    ) -> int:
         if parent.isValid():
             return 0
         return len(self._entries)
 
-    def columnCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:  # noqa: B008
+    def columnCount(  # noqa: N802
+        self, parent: QModelIndex | QPersistentModelIndex = _DEFAULT_MODEL_INDEX
+    ) -> int:
         if parent.isValid():
             return 0
         return len(_HEADERS)
@@ -174,15 +181,23 @@ class FileListModel(QAbstractTableModel):
         if col == _COL_CLIPPING:
             return _CLIP_YES if entry.clipping else ""
         if col == _COL_TRACK_GAIN:
-            return f"{entry.track_gain_db:.1f}" if entry.track_gain_db is not None else ""
+            return (
+                f"{entry.track_gain_db:.1f}" if entry.track_gain_db is not None else ""
+            )
         if col == _COL_CLIP_TRACK:
             if entry.clip_track is None:
                 return ""
             return f"{entry.clip_track:.1f}"
         if col == _COL_ALBUM_VOLUME:
-            return f"{entry.album_volume_db:.1f}" if entry.album_volume_db is not None else ""
+            return (
+                f"{entry.album_volume_db:.1f}"
+                if entry.album_volume_db is not None
+                else ""
+            )
         if col == _COL_ALBUM_GAIN:
-            return f"{entry.album_gain_db:.1f}" if entry.album_gain_db is not None else ""
+            return (
+                f"{entry.album_gain_db:.1f}" if entry.album_gain_db is not None else ""
+            )
         if col == _COL_CLIP_ALBUM:
             if entry.clip_album is None:
                 return ""
@@ -192,10 +207,16 @@ class FileListModel(QAbstractTableModel):
     def _foreground(self, entry: FileEntry, col: int) -> QColor | None:
         if col == _COL_CLIPPING and entry.clipping:
             return _RED
-        if col == _COL_CLIP_TRACK and entry.clip_track is not None:
-            if entry.clip_track > 1.0:
-                return _RED
-        if col == _COL_CLIP_ALBUM and entry.clip_album is not None:
-            if entry.clip_album > 1.0:
-                return _RED
+        if (
+            col == _COL_CLIP_TRACK
+            and entry.clip_track is not None
+            and entry.clip_track > 1.0
+        ):
+            return _RED
+        if (
+            col == _COL_CLIP_ALBUM
+            and entry.clip_album is not None
+            and entry.clip_album > 1.0
+        ):
+            return _RED
         return None

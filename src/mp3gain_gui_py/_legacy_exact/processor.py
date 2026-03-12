@@ -52,19 +52,29 @@ class LegacyExactProcessor:
         return gain_db
 
     def analyze_track_gain_db_with_fallback(self, path: Path) -> tuple[float, bool]:
-        gain_db, _max_amp, _min_gain, _max_gain = self._backend.scan_track_metrics(path, include_gain=True)
+        gain_db, _max_amp, _min_gain, _max_gain = self._backend.scan_track_metrics(
+            path, include_gain=True
+        )
         return gain_db, False
 
-    def analyze_track_gain_and_peak_with_fallback(self, path: Path) -> tuple[float, float, bool]:
-        gain_db, max_amp, _min_gain, _max_gain = self._backend.scan_track_metrics(path, include_gain=True)
+    def analyze_track_gain_and_peak_with_fallback(
+        self, path: Path
+    ) -> tuple[float, float, bool]:
+        gain_db, max_amp, _min_gain, _max_gain = self._backend.scan_track_metrics(
+            path, include_gain=True
+        )
         return gain_db, max_amp, False
 
     def analyze_max_amplitude(self, path: Path) -> float:
-        _gain_db, max_amp, _min_gain, _max_gain = self._backend.scan_track_metrics(path, include_gain=False)
+        _gain_db, max_amp, _min_gain, _max_gain = self._backend.scan_track_metrics(
+            path, include_gain=False
+        )
         return max_amp
 
     def analyze_minmax_gain(self, path: Path) -> tuple[int, int]:
-        _gain_db, _max_amp, min_gain, max_gain = self._backend.scan_track_metrics(path, include_gain=False)
+        _gain_db, _max_amp, min_gain, max_gain = self._backend.scan_track_metrics(
+            path, include_gain=False
+        )
         return min_gain, max_gain
 
     def analyze_track_metrics(
@@ -109,9 +119,11 @@ class LegacyExactProcessor:
             self._backend.begin_album_scan()
 
         for path in paths:
-            _track_gain, track_max_amp, track_min_gain, track_max_gain = self.analyze_track_metrics(
-                path,
-                include_gain=include_gain,
+            _track_gain, track_max_amp, track_min_gain, track_max_gain = (
+                self.analyze_track_metrics(
+                    path,
+                    include_gain=include_gain,
+                )
             )
             if track_min_gain < min_gain:
                 min_gain = track_min_gain
@@ -125,7 +137,9 @@ class LegacyExactProcessor:
             return album_gain, 0, 0, max_amp
         return album_gain, min_gain, max_gain, max_amp
 
-    def compute_autoclip_steps(self, requested_steps: int, *, min_gain: int, max_gain: int) -> int:
+    def compute_autoclip_steps(
+        self, requested_steps: int, *, min_gain: int, max_gain: int
+    ) -> int:
         """Clamp requested step deltas to avoid legacy global_gain clipping."""
         if requested_steps > 0:
             return min(requested_steps, 255 - max_gain)
@@ -201,7 +215,9 @@ class LegacyExactProcessor:
         options: LegacyCompatOptions,
     ) -> LegacyCommandResult:
         if channel_index not in {0, 1}:
-            return LegacyCommandResult(exit_code=1, changed=False, message="Channel index must be 0 or 1")
+            return LegacyCommandResult(
+                exit_code=1, changed=False, message="Channel index must be 0 or 1"
+            )
         left_steps = steps if channel_index == 0 else 0
         right_steps = steps if channel_index == 1 else 0
         return self.apply_steps(
@@ -236,7 +252,9 @@ class LegacyExactProcessor:
         """
         tags = self.read_replaygain_tags(path)
         if not tags.has_undo:
-            return LegacyCommandResult(exit_code=1, changed=False, message="Missing MP3GAIN_UNDO")
+            return LegacyCommandResult(
+                exit_code=1, changed=False, message="Missing MP3GAIN_UNDO"
+            )
         undo_left = tags.undo_left if tags.undo_left is not None else 0
         undo_right = tags.undo_right if tags.undo_right is not None else 0
         if undo_left == 0 and undo_right == 0:

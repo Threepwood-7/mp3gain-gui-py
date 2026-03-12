@@ -69,7 +69,9 @@ def test_build_one_skip_tags_does_not_rewrite_tags(
 
 
 def test_select_sample_names_is_seeded_and_sorted() -> None:
-    mod = _load_script_module("test_parity_external", "parity_external_sample_report.py")
+    mod = _load_script_module(
+        "test_parity_external", "parity_external_sample_report.py"
+    )
     names = [
         "zeta.mp3",
         "Alpha.mp3",

@@ -8,8 +8,7 @@ Legacy Pointers:
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from .formats import (
     ALL_MP3GAIN_KEYS,
@@ -26,7 +25,11 @@ from .formats import (
     format_undo,
 )
 from .legacy_apev2 import delete_legacy_apev2_keys, write_legacy_apev2_tags
-from .reader import TagData
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from .reader import TagData
 
 
 def write_tags(
@@ -101,6 +104,7 @@ def _write_id3(path: Path, data: TagData) -> None:
 def _delete_id3_keys(path: Path) -> None:
     try:
         import mutagen.id3 as _id3  # type: ignore[import-untyped]
+
         tags = _id3.ID3(str(path))
         changed = False
         for key in list(tags.keys()):
@@ -129,11 +133,19 @@ def _build_kv(data: TagData) -> dict[str, str]:
         kv[TAG_ALBUM_GAIN] = format_gain(data.album_gain_db)
     if data.album_peak is not None:
         kv[TAG_ALBUM_PEAK] = format_peak(data.album_peak)
-    if data.undo_left is not None and data.undo_right is not None and data.undo_mode is not None:
-        kv[TAG_MP3GAIN_UNDO] = format_undo(data.undo_left, data.undo_right, data.undo_mode)
+    if (
+        data.undo_left is not None
+        and data.undo_right is not None
+        and data.undo_mode is not None
+    ):
+        kv[TAG_MP3GAIN_UNDO] = format_undo(
+            data.undo_left, data.undo_right, data.undo_mode
+        )
     if data.min_gain is not None and data.max_gain is not None:
         kv[TAG_MP3GAIN_MINMAX] = format_minmax(data.min_gain, data.max_gain)
     if data.album_min_gain is not None and data.album_max_gain is not None:
-        kv[TAG_MP3GAIN_ALBUM_MINMAX] = format_minmax(data.album_min_gain, data.album_max_gain)
+        kv[TAG_MP3GAIN_ALBUM_MINMAX] = format_minmax(
+            data.album_min_gain, data.album_max_gain
+        )
 
     return kv

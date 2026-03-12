@@ -114,9 +114,11 @@ def album_group_gain_task(
 ) -> tuple[tuple[str, ...], float | None]:
     group_paths = [Path(path_text) for path_text in path_texts]
     try:
-        album_raw_db, _album_min_gain, _album_max_gain, _album_max_amp = _get_processor().analyze_album_metrics(
-            group_paths,
-            include_gain=not max_amp_only,
+        album_raw_db, _album_min_gain, _album_max_gain, _album_max_amp = (
+            _get_processor().analyze_album_metrics(
+                group_paths,
+                include_gain=not max_amp_only,
+            )
         )
         return path_texts, float(album_raw_db)
     except Exception:
@@ -150,9 +152,11 @@ def gain_file_task(
             return FileResult(path=path, ok=True)
 
         if force_apply_normalization and kind == "apply_track":
-            analyzed_gain_db, _max_amp, _min_gain, _max_gain = processor.analyze_track_metrics(
-                path,
-                include_gain=True,
+            analyzed_gain_db, _max_amp, _min_gain, _max_gain = (
+                processor.analyze_track_metrics(
+                    path,
+                    include_gain=True,
+                )
             )
             analyzed_steps = db_to_legacy_steps(analyzed_gain_db)
             steps = analyzed_steps + _target_offset_steps(target_db)
@@ -181,7 +185,9 @@ def gain_file_task(
                 gain_db = 0.0
             steps = db_to_legacy_steps(gain_db)
         else:
-            return FileResult(path=path, ok=False, error_msg=f"Unsupported gain task kind: {kind}")
+            return FileResult(
+                path=path, ok=False, error_msg=f"Unsupported gain task kind: {kind}"
+            )
 
         if (
             force_apply_normalization
@@ -203,14 +209,12 @@ def gain_file_task(
     return FileResult(path=path, ok=True)
 
 
-def delete_tags_file_task(path_text: str, *, tag_mode: str | None = "apev2") -> FileResult:
+def delete_tags_file_task(
+    path_text: str, *, tag_mode: str | None = "apev2"
+) -> FileResult:
     path = Path(path_text)
     try:
-        tag_format: str | None
-        if tag_mode in {"apev2", "id3"}:
-            tag_format = tag_mode
-        else:
-            tag_format = None
+        tag_format = tag_mode if tag_mode in {"apev2", "id3"} else None
         result = _get_processor().delete_mp3gain_tags(path, tag_format=tag_format)
         if result.exit_code != 0:
             return FileResult(path=path, ok=False, error_msg=result.message)

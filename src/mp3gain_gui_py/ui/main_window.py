@@ -16,9 +16,9 @@ from .window.persistence import WindowPersistenceCoordinator
 from .window.status import WindowStatusCoordinator
 
 if TYPE_CHECKING:
-    from ..app_controller import AppController
     from .._settings.manager import SettingsManager
     from .._workers.worker_bridge import WorkerBridge
+    from ..app_controller import AppController
 
 
 class MainWindow(QMainWindow):
@@ -83,13 +83,13 @@ class MainWindow(QMainWindow):
 
     # ── Drag-and-drop ─────────────────────────────────────────────────────────
 
-    def dragEnterEvent(self, event: Any) -> None:
+    def dragEnterEvent(self, event: Any) -> None:  # noqa: N802
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
         else:
             event.ignore()
 
-    def dropEvent(self, event: Any) -> None:
+    def dropEvent(self, event: Any) -> None:  # noqa: N802
         urls = event.mimeData().urls()
         paths: list[Path] = []
         for url in urls:

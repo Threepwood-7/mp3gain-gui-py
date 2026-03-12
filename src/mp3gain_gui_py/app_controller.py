@@ -9,9 +9,14 @@ from PySide6.QtWidgets import QApplication
 from threep_commons.logging import setup_logging_from_identity
 from threep_commons.paths import configure_qsettings, resolve_app_data_dir
 
-from .constants import APP_DISPLAY_NAME, APP_IDENTITY, SETTINGS_APP_NAME, SETTINGS_ORG_NAME
 from ._settings.manager import SettingsManager
 from ._workers.worker_bridge import WorkerBridge
+from .constants import (
+    APP_DISPLAY_NAME,
+    APP_IDENTITY,
+    SETTINGS_APP_NAME,
+    SETTINGS_ORG_NAME,
+)
 
 
 class AppController:
@@ -37,9 +42,11 @@ class AppController:
         self.bridge = WorkerBridge(parent=self.app)
 
         # Import late to avoid circular dependency (ui needs controller)
-        from .ui.main_window import MainWindow  # noqa: PLC0415
+        from .ui.main_window import MainWindow
 
-        self.window = MainWindow(controller=self, settings=self.settings, bridge=self.bridge)
+        self.window = MainWindow(
+            controller=self, settings=self.settings, bridge=self.bridge
+        )
 
     def run(self) -> int:
         self.window.show()

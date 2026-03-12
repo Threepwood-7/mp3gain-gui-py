@@ -8,22 +8,24 @@ uses AutoConnection which queues to the receiver's thread automatically.
 from __future__ import annotations
 
 import threading
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QObject, Signal
 
-from .types import FileResult, WorkerRequest, WorkerResult
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from .types import FileResult, WorkerRequest, WorkerResult
 
 
 class WorkerBridge(QObject):
     """Qt signal hub for background MP3Gain workers."""
 
-    file_started = Signal(object)   # Path
-    file_done = Signal(object)      # FileResult
-    all_done = Signal(object)       # WorkerResult
-    progress = Signal(int, int)     # completed, total
-    error = Signal(str)             # error message
+    file_started = Signal(object)  # Path
+    file_done = Signal(object)  # FileResult
+    all_done = Signal(object)  # WorkerResult
+    progress = Signal(int, int)  # completed, total
+    error = Signal(str)  # error message
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -44,15 +46,15 @@ class WorkerBridge(QObject):
 
         kind = request.kind
         if kind in ("track_analyze", "album_analyze"):
-            from .analyze_worker import AnalyzeWorker  # noqa: PLC0415
+            from .analyze_worker import AnalyzeWorker
 
             worker: Any = AnalyzeWorker(request, self)
         elif kind in ("apply_track", "apply_album", "apply_constant", "undo"):
-            from .gain_worker import GainWorker  # noqa: PLC0415
+            from .gain_worker import GainWorker
 
             worker = GainWorker(request, self)
         else:
-            from .tag_worker import TagWorker  # noqa: PLC0415
+            from .tag_worker import TagWorker
 
             worker = TagWorker(request, self)
 

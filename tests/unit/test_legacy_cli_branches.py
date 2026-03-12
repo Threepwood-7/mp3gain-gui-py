@@ -48,7 +48,9 @@ class _BranchFakeProcessor:
         self.analyze_album_minmax_paths.append(list(paths))
         return 38, 210
 
-    def compute_autoclip_steps(self, requested_steps: int, *, min_gain: int, max_gain: int) -> int:
+    def compute_autoclip_steps(
+        self, requested_steps: int, *, min_gain: int, max_gain: int
+    ) -> int:
         _ = min_gain
         _ = max_gain
         return requested_steps
@@ -253,7 +255,9 @@ def test_album_apply_branch_uses_shared_album_steps_for_all_files(
     assert len(applied_steps) == 1
 
 
-def test_undo_branch_calls_processor_undo(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_undo_branch_calls_processor_undo(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     target = tmp_path / "sample.mp3"
     target.write_bytes(b"x")
     fake = _install_fake_processor(monkeypatch)
@@ -286,7 +290,11 @@ def test_clip_guard_blocks_apply_without_c_or_k_or_f(
         "_load_runtime_tags",
         lambda _processor, _path, *, tag_format: TagData(tag_format="none"),
     )
-    monkeypatch.setattr(legacy_cli, "db_to_legacy_steps", lambda _gain, mp3_gain_mod=0: 10 + mp3_gain_mod)
+    monkeypatch.setattr(
+        legacy_cli,
+        "db_to_legacy_steps",
+        lambda _gain, mp3_gain_mod=0: 10 + mp3_gain_mod,
+    )
     code = legacy_cli.main(["/q", "/r", str(target)])
 
     assert code == 1

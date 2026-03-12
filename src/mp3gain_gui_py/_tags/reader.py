@@ -8,8 +8,10 @@ Legacy Pointers:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from .formats import (
     TAG_ALBUM_GAIN,
@@ -39,7 +41,7 @@ class TagData:
 
     undo_left: int | None = None
     undo_right: int | None = None
-    undo_mode: str | None = None        # 'W' or 'N'
+    undo_mode: str | None = None  # 'W' or 'N'
 
     min_gain: int | None = None
     max_gain: int | None = None
@@ -88,6 +90,7 @@ def read_tags(path: Path) -> TagData:
 def _read_apev2(path: Path) -> TagData | None:
     try:
         import mutagen.apev2 as _apev2  # type: ignore[import-untyped]
+
         tags = _apev2.APEv2(str(path))
     except Exception:
         return None
@@ -100,6 +103,7 @@ def _read_apev2(path: Path) -> TagData | None:
 def _read_id3(path: Path) -> TagData | None:
     try:
         import mutagen.id3 as _id3  # type: ignore[import-untyped]
+
         tags = _id3.ID3(str(path))
     except Exception:
         return None

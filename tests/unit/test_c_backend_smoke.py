@@ -24,4 +24,3 @@ def test_c_backend_build_and_error_path() -> None:
             preserve_timestamp=False,
             use_temp_file=True,
         )
-

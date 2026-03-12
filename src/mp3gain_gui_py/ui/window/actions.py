@@ -178,9 +178,7 @@ class WindowActionsCoordinator:
     def _on_remove(self) -> None:
         rows = self._window.layout_coord.selected_rows()
         paths = [
-            e.path
-            for i in rows
-            if (e := self._window.model.entry_at(i)) is not None
+            e.path for i in rows if (e := self._window.model.entry_at(i)) is not None
         ]
         if paths:
             self._window.model.remove_files(paths)

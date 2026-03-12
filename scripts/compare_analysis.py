@@ -24,13 +24,55 @@ TARGET_DB = 89.0
 # Reference values from mp3gain.exe -q -o (track dB gain, volume, track gain steps)
 # File | mp3gain-steps | raw-dB | max-amp | max-global-gain | min-global-gain
 REFERENCE = {
-    "1.mp3": {"mp3gain_steps": -6, "raw_db": -9.21, "max_amp": 33973.51, "max_gain": 210, "min_gain": 82},
-    "2.mp3": {"mp3gain_steps": -4, "raw_db": -6.29, "max_amp": 32255.55, "max_gain": 210, "min_gain": 76},
-    "3.mp3": {"mp3gain_steps": -6, "raw_db": -9.10, "max_amp": 35503.78, "max_gain": 210, "min_gain": 38},
-    "4.mp3": {"mp3gain_steps": -6, "raw_db": -9.02, "max_amp": 34830.25, "max_gain": 210, "min_gain": 47},
-    "5.mp3": {"mp3gain_steps": -7, "raw_db": -11.21, "max_amp": 34677.88, "max_gain": 188, "min_gain": 118},
-    "6.mp3": {"mp3gain_steps": -5, "raw_db": -6.99, "max_amp": 38316.25, "max_gain": 210, "min_gain": 103},
-    "7.mp3": {"mp3gain_steps": -7, "raw_db": -9.85, "max_amp": 35637.46, "max_gain": 187, "min_gain": 117},
+    "1.mp3": {
+        "mp3gain_steps": -6,
+        "raw_db": -9.21,
+        "max_amp": 33973.51,
+        "max_gain": 210,
+        "min_gain": 82,
+    },
+    "2.mp3": {
+        "mp3gain_steps": -4,
+        "raw_db": -6.29,
+        "max_amp": 32255.55,
+        "max_gain": 210,
+        "min_gain": 76,
+    },
+    "3.mp3": {
+        "mp3gain_steps": -6,
+        "raw_db": -9.10,
+        "max_amp": 35503.78,
+        "max_gain": 210,
+        "min_gain": 38,
+    },
+    "4.mp3": {
+        "mp3gain_steps": -6,
+        "raw_db": -9.02,
+        "max_amp": 34830.25,
+        "max_gain": 210,
+        "min_gain": 47,
+    },
+    "5.mp3": {
+        "mp3gain_steps": -7,
+        "raw_db": -11.21,
+        "max_amp": 34677.88,
+        "max_gain": 188,
+        "min_gain": 118,
+    },
+    "6.mp3": {
+        "mp3gain_steps": -5,
+        "raw_db": -6.99,
+        "max_amp": 38316.25,
+        "max_gain": 210,
+        "min_gain": 103,
+    },
+    "7.mp3": {
+        "mp3gain_steps": -7,
+        "raw_db": -9.85,
+        "max_amp": 35637.46,
+        "max_gain": 187,
+        "min_gain": 117,
+    },
 }
 
 
@@ -66,9 +108,11 @@ def analyze_file(path: Path) -> dict[str, object]:
 
 
 def main() -> None:
-    print(f"{'File':<12} {'Volume':>7} {'RawdB':>8} {'Steps':>6} {'AppliedDB':>10} "
-          f"{'MaxAmp':>12} {'MaxG':>5} {'MinG':>5}  "
-          f"{'vs ref raw_db':>14} {'steps?':>7} {'max?':>6} {'min?':>6}")
+    print(
+        f"{'File':<12} {'Volume':>7} {'RawdB':>8} {'Steps':>6} {'AppliedDB':>10} "
+        f"{'MaxAmp':>12} {'MaxG':>5} {'MinG':>5}  "
+        f"{'vs ref raw_db':>14} {'steps?':>7} {'max?':>6} {'min?':>6}"
+    )
     print("-" * 123)
 
     all_ok = True
@@ -99,7 +143,16 @@ def main() -> None:
         max_gain_match = max_gain == ref_max_gain
         min_gain_match = min_gain == ref_min_gain
 
-        status = "OK" if (abs(delta_db) < 0.15 and steps_match and max_gain_match and min_gain_match) else "MISMATCH"
+        status = (
+            "OK"
+            if (
+                abs(delta_db) < 0.15
+                and steps_match
+                and max_gain_match
+                and min_gain_match
+            )
+            else "MISMATCH"
+        )
         if status != "OK":
             all_ok = False
 
@@ -119,11 +172,14 @@ def main() -> None:
     # Now verify the 89db reference files with mp3gain.exe
     print("Running mp3gain.exe on reference 89db files for cross-check...")
     import subprocess
+
     ref_files = sorted(REFERENCE_DIR.glob("*.mp3"))
     if ref_files:
         r = subprocess.run(
-            ["c:/bin/mp3gain-win-1_2_5/mp3gain.exe", "-q", "-o"] + [str(f) for f in ref_files],
-            capture_output=True, text=True
+            ["c:/bin/mp3gain-win-1_2_5/mp3gain.exe", "-q", "-o"]
+            + [str(f) for f in ref_files],
+            capture_output=True,
+            text=True,
         )
         print(r.stdout or r.stderr)
 

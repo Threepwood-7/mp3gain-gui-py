@@ -6,7 +6,7 @@ import sys
 
 
 def main() -> int:
-    from .app_controller import AppController  # noqa: PLC0415
+    from .app_controller import AppController
 
     ctrl = AppController(sys.argv)
     return ctrl.run()

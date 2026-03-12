@@ -16,8 +16,8 @@ from PySide6.QtWidgets import (
 )
 
 if TYPE_CHECKING:
-    from .._main_window import MainWindow
     from ..._model.file_list_model import FileListModel
+    from .._main_window import MainWindow
 
 
 class WindowLayoutCoordinator:
@@ -95,7 +95,9 @@ class WindowLayoutCoordinator:
         self.progress_file.setVisible(visible)
         self.progress_total.setVisible(visible)
 
-    def set_progress(self, file_val: int, file_max: int, total_val: int, total_max: int) -> None:
+    def set_progress(
+        self, file_val: int, file_max: int, total_val: int, total_max: int
+    ) -> None:
         self.progress_file.setMaximum(file_max)
         self.progress_file.setValue(file_val)
         self.progress_total.setMaximum(total_max)
@@ -110,5 +112,7 @@ class WindowLayoutCoordinator:
     def accept_drops(self, enable: bool = True) -> None:
         self.file_view.setAcceptDrops(enable)
         self.file_view.setDragDropMode(
-            QTableView.DragDropMode.DropOnly if enable else QTableView.DragDropMode.NoDragDrop
+            QTableView.DragDropMode.DropOnly
+            if enable
+            else QTableView.DragDropMode.NoDragDrop
         )

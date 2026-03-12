@@ -63,7 +63,9 @@ def _analyze_track_gain_db(path: Path) -> tuple[float, bool]:
     return LegacyExactProcessor().analyze_track_gain_db_with_fallback(path)
 
 
-def _build_one(src_path: Path, dst_path: Path, *, legacy_profile: str) -> dict[str, object]:
+def _build_one(
+    src_path: Path, dst_path: Path, *, legacy_profile: str
+) -> dict[str, object]:
     """Build one codex output file from an original source input.
 
     Legacy pointer: LEGACY_PTR:PARITY_BUILD_89DB.
@@ -140,7 +142,9 @@ def _build_one(src_path: Path, dst_path: Path, *, legacy_profile: str) -> dict[s
     }
 
 
-def _build_one_worker(src_text: str, dst_text: str, legacy_profile: str) -> dict[str, object]:
+def _build_one_worker(
+    src_text: str, dst_text: str, legacy_profile: str
+) -> dict[str, object]:
     return _build_one(Path(src_text), Path(dst_text), legacy_profile=legacy_profile)
 
 
@@ -202,7 +206,9 @@ def _write_cache(
         "tool_signature_hash": signature_hash,
         "files": files,
     }
-    _cache_path(snapshot_dir).write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    _cache_path(snapshot_dir).write_text(
+        json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
 
 def _parse_args() -> Namespace:
@@ -261,7 +267,9 @@ def main() -> int:
 
     signature_payload = _tool_signature_payload(legacy_profile=legacy_profile)
     signature_hash = _signature_hash(signature_payload)
-    cache_files = _load_cache(expected_signature_hash=signature_hash, snapshot_dir=snapshot_dir)
+    cache_files = _load_cache(
+        expected_signature_hash=signature_hash, snapshot_dir=snapshot_dir
+    )
 
     source_files = list_mp3_files(original_dir)
     source_names = {path.name for path in source_files}
@@ -318,7 +326,9 @@ def main() -> int:
     if pending:
         with ProcessPoolExecutor(max_workers=min(jobs_used, len(pending))) as executor:
             future_map = {
-                executor.submit(_build_one_worker, str(src), str(dst), legacy_profile): src.name
+                executor.submit(
+                    _build_one_worker, str(src), str(dst), legacy_profile
+                ): src.name
                 for src, dst in pending
             }
             for future in as_completed(future_map):
@@ -386,12 +396,16 @@ def main() -> int:
         "removed_stale_files": removed,
         "failed_files": sorted(errors_by_name),
         "rebuilt_files": sum(
-            1 for item in results if item.get("skipped") is False and "error" not in item
+            1
+            for item in results
+            if item.get("skipped") is False and "error" not in item
         ),
         "skipped_files": sum(1 for item in results if item.get("skipped") is True),
         "results": results,
     }
-    report_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    report_path.write_text(
+        json.dumps(report, indent=2, sort_keys=True), encoding="utf-8"
+    )
     print(f"Build report written: {report_path}")
     return 0 if not errors_by_name else 1
 

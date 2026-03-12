@@ -20,11 +20,11 @@ _MONO = 0x03
 # Bitrate table [mpeg_ver_idx][bitrate_idx] in kbps
 _BITRATE: tuple[tuple[int, ...], ...] = (
     # MPEG 2.5  (ver 0x00)
-    (0,  8, 16, 24, 32, 40, 48, 56,  64,  80,  96, 112, 128, 144, 160, 0),
+    (0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0),
     # reserved  (ver 0x01)
-    (0,  0,  0,  0,  0,  0,  0,  0,   0,   0,   0,   0,   0,   0,   0, 0),
+    (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
     # MPEG 2    (ver 0x02)
-    (0,  8, 16, 24, 32, 40, 48, 56,  64,  80,  96, 112, 128, 144, 160, 0),
+    (0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0),
     # MPEG 1    (ver 0x03)
     (0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0),
 )
@@ -32,9 +32,9 @@ _BITRATE: tuple[tuple[int, ...], ...] = (
 # Sample-rate table [mpeg_ver_idx][freq_idx] in Hz
 _SAMPLERATE: tuple[tuple[int, ...], ...] = (
     # MPEG 2.5
-    (11025, 12000,  8000, 0),
+    (11025, 12000, 8000, 0),
     # reserved
-    (    0,     0,     0, 0),
+    (0, 0, 0, 0),
     # MPEG 2
     (22050, 24000, 16000, 0),
     # MPEG 1
@@ -47,15 +47,15 @@ class FrameHeader:
     """Decoded MPEG Layer III frame header."""
 
     sync_valid: bool
-    mpeg_version: int       # raw bits (0x03=MPEG1, 0x02=MPEG2, 0x00=MPEG2.5)
-    layer: int              # raw bits (0x01=LayerIII)
-    crc_protected: bool     # True when CRC field is present (protection_bit == 0)
+    mpeg_version: int  # raw bits (0x03=MPEG1, 0x02=MPEG2, 0x00=MPEG2.5)
+    layer: int  # raw bits (0x01=LayerIII)
+    crc_protected: bool  # True when CRC field is present (protection_bit == 0)
     bitrate_kbps: int
     sample_rate_hz: int
     padding: bool
-    channel_mode: int       # raw bits (0x03=mono, else stereo variants)
-    num_channels: int       # 1 or 2
-    frame_size_bytes: int   # total frame size in bytes (header + data)
+    channel_mode: int  # raw bits (0x03=mono, else stereo variants)
+    num_channels: int  # 1 or 2
+    frame_size_bytes: int  # total frame size in bytes (header + data)
 
 
 def parse_frame_header(data: bytes, offset: int) -> FrameHeader | None:
@@ -90,9 +90,9 @@ def parse_frame_header(data: bytes, offset: int) -> FrameHeader | None:
     freq_idx = (b2 >> 2) & 0x03
 
     if bitrate_idx == 0x0F or bitrate_idx == 0x00:
-        return None   # forbidden / free-format
+        return None  # forbidden / free-format
     if freq_idx == 0x03:
-        return None   # reserved
+        return None  # reserved
 
     crc_protected = not bool(b1 & 0x01)  # protection_bit=0 means CRC present
     bitrate_kbps = _BITRATE[mpeg_ver][bitrate_idx]
@@ -109,7 +109,9 @@ def parse_frame_header(data: bytes, offset: int) -> FrameHeader | None:
     # MPEG2/2.5 uses 72 * bitrate / samplerate
     bitbase = 144.0 if mpeg_ver == _MPEG1 else 72.0
 
-    frame_size = int(bitbase * bitrate_kbps * 1000 / sample_rate_hz) + (1 if padding else 0)
+    frame_size = int(bitbase * bitrate_kbps * 1000 / sample_rate_hz) + (
+        1 if padding else 0
+    )
 
     return FrameHeader(
         sync_valid=True,
@@ -133,7 +135,11 @@ def find_next_frame(data: bytes, start: int) -> int:
     i = start
     limit = len(data) - 3
     while i <= limit:
-        if data[i] == 0xFF and (data[i + 1] & 0xE0) == 0xE0 and parse_frame_header(data, i) is not None:
+        if (
+            data[i] == 0xFF
+            and (data[i + 1] & 0xE0) == 0xE0
+            and parse_frame_header(data, i) is not None
+        ):
             return i
         i += 1
     return -1
@@ -173,13 +179,15 @@ def global_gain_offsets(header: FrameHeader) -> list[tuple[int, int]]:
       bit 8     private_bits (1)
       channelx63-bit block
     """
-    is_mpeg1 = (header.mpeg_version == _MPEG1)
+    is_mpeg1 = header.mpeg_version == _MPEG1
     nchan = header.num_channels
-    mono = (nchan == 1)
+    mono = nchan == 1
 
     # Number of bits from start of sideinfo to first channel-block
     if is_mpeg1:
-        pre_bits = 9 + (5 if mono else 3) + (nchan * 4)  # main_data_begin + private + scfsi
+        pre_bits = (
+            9 + (5 if mono else 3) + (nchan * 4)
+        )  # main_data_begin + private + scfsi
         n_granules = 2
         block_bits = 59  # 21 skip + 8 gain + 30 remainder (21+38 total advance = 59)
     else:
@@ -214,5 +222,5 @@ def has_xing_or_info_tag(data: bytes, frame_offset: int, header: FrameHeader) ->
 
     sideinfo_start = frame_offset + 4 + (2 if header.crc_protected else 0)
     marker_offset = sideinfo_start + sideinfo_len
-    marker = data[marker_offset: marker_offset + 4]
+    marker = data[marker_offset : marker_offset + 4]
     return marker in (b"Xing", b"Info")

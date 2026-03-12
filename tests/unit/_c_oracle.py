@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import ctypes
-from ctypes import c_double, c_int
 import os
-from pathlib import Path
 import shutil
 import subprocess
+from ctypes import c_double, c_int
+from pathlib import Path
 from typing import Final
 
-
 REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
-C_ORACLE_SOURCE: Final[Path] = REPO_ROOT / "tests" / "unit" / "c_oracle" / "legacy_math_oracle.c"
+C_ORACLE_SOURCE: Final[Path] = (
+    REPO_ROOT / "tests" / "unit" / "c_oracle" / "legacy_math_oracle.c"
+)
 BUILD_ROOT: Final[Path] = Path(r"c:\tmp\pycompa\mp3gain_c_oracle")
 DLL_PATH: Final[Path] = BUILD_ROOT / "legacy_math_oracle.dll"
 
@@ -103,7 +104,12 @@ def load_c_oracle(force_rebuild: bool = False) -> ctypes.CDLL:
     dll.mp3gain_c_autoclip_album_gain.argtypes = [c_int, c_double]
     dll.mp3gain_c_autoclip_album_gain.restype = c_int
 
-    dll.mp3gain_c_update_tag_state.argtypes = [ctypes.POINTER(CTagState), c_int, c_int, c_int]
+    dll.mp3gain_c_update_tag_state.argtypes = [
+        ctypes.POINTER(CTagState),
+        c_int,
+        c_int,
+        c_int,
+    ]
     dll.mp3gain_c_update_tag_state.restype = None
 
     return dll

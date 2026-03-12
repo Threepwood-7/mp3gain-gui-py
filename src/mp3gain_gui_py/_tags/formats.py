@@ -5,14 +5,15 @@ Legacy Pointers:
 """
 
 from __future__ import annotations
-from decimal import Decimal, ROUND_HALF_UP
 
+from decimal import ROUND_HALF_UP, Decimal
 
 _SIX_DP = Decimal("0.000001")
 
 
 def _round_six_half_up(value: float) -> Decimal:
     return Decimal(str(value)).quantize(_SIX_DP, rounding=ROUND_HALF_UP)
+
 
 # ── Tag key constants ──────────────────────────────────────────────────────────
 TAG_TRACK_GAIN = "REPLAYGAIN_TRACK_GAIN"
@@ -23,18 +24,21 @@ TAG_MP3GAIN_UNDO = "MP3GAIN_UNDO"
 TAG_MP3GAIN_MINMAX = "MP3GAIN_MINMAX"
 TAG_MP3GAIN_ALBUM_MINMAX = "MP3GAIN_ALBUM_MINMAX"
 
-ALL_MP3GAIN_KEYS: frozenset[str] = frozenset({
-    TAG_TRACK_GAIN,
-    TAG_TRACK_PEAK,
-    TAG_ALBUM_GAIN,
-    TAG_ALBUM_PEAK,
-    TAG_MP3GAIN_UNDO,
-    TAG_MP3GAIN_MINMAX,
-    TAG_MP3GAIN_ALBUM_MINMAX,
-})
+ALL_MP3GAIN_KEYS: frozenset[str] = frozenset(
+    {
+        TAG_TRACK_GAIN,
+        TAG_TRACK_PEAK,
+        TAG_ALBUM_GAIN,
+        TAG_ALBUM_PEAK,
+        TAG_MP3GAIN_UNDO,
+        TAG_MP3GAIN_MINMAX,
+        TAG_MP3GAIN_ALBUM_MINMAX,
+    }
+)
 
 
 # ── Formatters ─────────────────────────────────────────────────────────────────
+
 
 def format_gain(db: float) -> str:
     """Format a gain value as ``+0.123456 dB`` (9-decimal, explicit sign).
@@ -66,6 +70,7 @@ def format_minmax(min_g: int, max_g: int) -> str:
 
 
 # ── Parsers ────────────────────────────────────────────────────────────────────
+
 
 def parse_gain(raw: str) -> float | None:
     """Parse a gain string like ``+9.210000 dB`` → ``9.21``.

@@ -76,7 +76,9 @@ def _parse_int(value: str, *, switch: str) -> int:
         raise ValueError(f"Invalid value for {switch}: {value!r}") from exc
 
 
-def _consume_value(argv: list[str], index: int, attached: str, *, switch: str) -> tuple[str, int]:
+def _consume_value(
+    argv: list[str], index: int, attached: str, *, switch: str
+) -> tuple[str, int]:
     if attached:
         return attached, index
     next_index = index + 1
@@ -116,7 +118,9 @@ def _parse_single_channel_value(value: str) -> _SingleChannelRequest:
                 channel_index=_parse_int(left.strip(), switch="/l"),
                 steps=_parse_int(right.strip(), switch="/l"),
             )
-    raise ValueError(f"Invalid attached /l value: {value!r}; expected '<channel>,<steps>'")
+    raise ValueError(
+        f"Invalid attached /l value: {value!r}; expected '<channel>,<steps>'"
+    )
 
 
 def _parse_legacy_args(argv: list[str] | None) -> _LegacyCliArgs:
@@ -216,7 +220,9 @@ def _parse_legacy_args(argv: list[str] | None) -> _LegacyCliArgs:
                     raise ValueError("Missing '/l <channel> <steps>' arguments")
                 channel = _parse_int(tokens[i + 1], switch="/l")
                 steps = _parse_int(tokens[i + 2], switch="/l")
-                single_channel = _SingleChannelRequest(channel_index=channel, steps=steps)
+                single_channel = _SingleChannelRequest(
+                    channel_index=channel, steps=steps
+                )
                 i += 2
         elif switch == "s":
             value, i = _consume_value(tokens, i, attached, switch="/s")
@@ -269,7 +275,9 @@ def _default_options(args: _LegacyCliArgs) -> LegacyCompatOptions:
     )
 
 
-def _tags_to_metrics(tags: TagData, *, mp3_gain_mod: int) -> tuple[int, float, float, int, int]:
+def _tags_to_metrics(
+    tags: TagData, *, mp3_gain_mod: int
+) -> tuple[int, float, float, int, int]:
     track_gain = tags.track_gain_db if tags.track_gain_db is not None else 0.0
     steps = db_to_legacy_steps(track_gain, mp3_gain_mod=mp3_gain_mod)
     max_amp = (tags.track_peak or 0.0) * 32768.0
@@ -319,13 +327,17 @@ def _format_table_line(
     return "\t".join(fields)
 
 
-def _print_info(mode: Literal["none", "version", "help", "help_qmark"], topic: str) -> None:
+def _print_info(
+    mode: Literal["none", "version", "help", "help_qmark"], topic: str
+) -> None:
     if mode == "version":
         print("mp3gain-gui-py legacy_cli parity mode (target baseline: 89 dB)")
         return
     if mode in {"help", "help_qmark"}:
         print("Usage: legacy_cli [switches] file1.mp3 [file2.mp3 ...]")
-        print("Switches: /v /h /? /g /l /r /k /a /m /d /c /o /t /q /p /x /f /s /u /w /e")
+        print(
+            "Switches: /v /h /? /g /l /r /k /a /m /d /c /o /t /q /p /x /f /s /u /w /e"
+        )
         if topic:
             print(f"Help topic: {topic}")
 
@@ -475,7 +487,9 @@ def _apply_gain_and_update_tags(
             tags.album_min_gain = None
             tags.album_max_gain = None
         elif not wrap_gain:
-            tags.album_min_gain = 0 if tags.album_min_gain == 0 else _clamp_gain_byte(cur_min)
+            tags.album_min_gain = (
+                0 if tags.album_min_gain == 0 else _clamp_gain_byte(cur_min)
+            )
             tags.album_max_gain = _clamp_gain_byte(cur_max)
 
 
@@ -590,7 +604,9 @@ def main(argv: list[str] | None = None) -> int:
         elif args.undo_requested:
             print("File\tleft global_gain change\tright global_gain change")
         else:
-            print("File\tMP3 gain\tdB gain\tMax Amplitude\tMax global_gain\tMin global_gain")
+            print(
+                "File\tMP3 gain\tdB gain\tMax Amplitude\tMax global_gain\tMin global_gain"
+            )
 
     try:
         processor = LegacyExactProcessor()
@@ -627,7 +643,9 @@ def main(argv: list[str] | None = None) -> int:
             and args.stored_tag_policy == "auto"
             and args.stored_tag_policy != "recalc"
         ):
-            candidate = _load_runtime_tags(processor, existing_paths[0], tag_format=args.tag_format)
+            candidate = _load_runtime_tags(
+                processor, existing_paths[0], tag_format=args.tag_format
+            )
             if (
                 candidate.track_gain_db is not None
                 and candidate.track_peak is not None
@@ -642,11 +660,14 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 album_tag_gain = single_existing.track_gain_db or 0.0
             album_db_gain = album_tag_gain + args.db_mod
-            album_steps = db_to_legacy_steps(album_db_gain, mp3_gain_mod=args.mp3_gain_mod)
-            album_max_amp = (
-                (single_existing.track_peak if single_existing.track_peak is not None else single_existing.album_peak)
-                * 32768.0
+            album_steps = db_to_legacy_steps(
+                album_db_gain, mp3_gain_mod=args.mp3_gain_mod
             )
+            album_max_amp = (
+                single_existing.track_peak
+                if single_existing.track_peak is not None
+                else single_existing.album_peak
+            ) * 32768.0
             album_min_gain = (
                 single_existing.min_gain
                 if single_existing.min_gain is not None
@@ -659,17 +680,35 @@ def main(argv: list[str] | None = None) -> int:
             )
         else:
             if hasattr(processor, "analyze_album_metrics"):
-                album_tag_gain, album_min_gain, album_max_gain, album_max_amp = processor.analyze_album_metrics(
-                    existing_paths,
-                    include_gain=not args.max_amp_only,
+                album_tag_gain, album_min_gain, album_max_gain, album_max_amp = (
+                    processor.analyze_album_metrics(
+                        existing_paths,
+                        include_gain=not args.max_amp_only,
+                    )
                 )
             else:
-                album_tag_gain = 0.0 if args.max_amp_only else processor.analyze_album_gain_db(existing_paths)
-                album_min_gain, album_max_gain = processor.analyze_album_minmax_gain(existing_paths)
-                album_max_amp = max((processor.analyze_max_amplitude(path) for path in existing_paths), default=0.0)
+                album_tag_gain = (
+                    0.0
+                    if args.max_amp_only
+                    else processor.analyze_album_gain_db(existing_paths)
+                )
+                album_min_gain, album_max_gain = processor.analyze_album_minmax_gain(
+                    existing_paths
+                )
+                album_max_amp = max(
+                    (processor.analyze_max_amplitude(path) for path in existing_paths),
+                    default=0.0,
+                )
             album_db_gain = album_tag_gain + args.db_mod
-            album_steps = db_to_legacy_steps(album_db_gain, mp3_gain_mod=args.mp3_gain_mod)
-        if args.apply_mode == "album" and args.auto_clip and album_steps is not None and album_max_amp is not None:
+            album_steps = db_to_legacy_steps(
+                album_db_gain, mp3_gain_mod=args.mp3_gain_mod
+            )
+        if (
+            args.apply_mode == "album"
+            and args.auto_clip
+            and album_steps is not None
+            and album_max_amp is not None
+        ):
             max_no_clip = _max_no_clip_steps(album_max_amp)
             if max_no_clip is not None and album_steps > max_no_clip:
                 album_steps = max_no_clip
@@ -693,7 +732,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(
                     f'Recommended "Track" dB change: {db_gain:.6f}\n'
                     f'Recommended "Track" mp3 gain change: {steps}\n'
-                    f'Applied step dB (exact): {legacy_steps_to_db_exact(steps):.6f}'
+                    f"Applied step dB (exact): {legacy_steps_to_db_exact(steps):.6f}"
                 )
             continue
 
@@ -707,7 +746,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.undo_requested:
             undo_left = tags.undo_left
             undo_right = tags.undo_right
-            if undo_left is not None and undo_right is not None and (undo_left != 0 or undo_right != 0):
+            if (
+                undo_left is not None
+                and undo_right is not None
+                and (undo_left != 0 or undo_right != 0)
+            ):
                 result = processor.apply_steps(
                     path,
                     left_steps=undo_left,
@@ -750,8 +793,16 @@ def main(argv: list[str] | None = None) -> int:
             )
             if result.exit_code != 0:
                 if not skip_tag_updates:
-                    left = args.single_channel.steps if args.single_channel.channel_index == 0 else 0
-                    right = args.single_channel.steps if args.single_channel.channel_index == 1 else 0
+                    left = (
+                        args.single_channel.steps
+                        if args.single_channel.channel_index == 0
+                        else 0
+                    )
+                    right = (
+                        args.single_channel.steps
+                        if args.single_channel.channel_index == 1
+                        else 0
+                    )
                     _apply_gain_and_update_tags(
                         tags,
                         left_gain_change=left,
@@ -770,8 +821,16 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"{path}: {result.message}")
                 continue
             if not skip_tag_updates and args.single_channel.steps != 0:
-                left = args.single_channel.steps if args.single_channel.channel_index == 0 else 0
-                right = args.single_channel.steps if args.single_channel.channel_index == 1 else 0
+                left = (
+                    args.single_channel.steps
+                    if args.single_channel.channel_index == 0
+                    else 0
+                )
+                right = (
+                    args.single_channel.steps
+                    if args.single_channel.channel_index == 1
+                    else 0
+                )
                 _apply_gain_and_update_tags(
                     tags,
                     left_gain_change=left,
@@ -788,7 +847,9 @@ def main(argv: list[str] | None = None) -> int:
             continue
 
         if args.direct_gain_steps is not None:
-            result = processor.apply_direct_gain_steps(path, steps=args.direct_gain_steps, options=options)
+            result = processor.apply_direct_gain_steps(
+                path, steps=args.direct_gain_steps, options=options
+            )
             if result.exit_code != 0:
                 failures += 1
                 if not args.quiet:
@@ -847,7 +908,9 @@ def main(argv: list[str] | None = None) -> int:
                     include_gain=not args.max_amp_only,
                 )
             else:
-                raw_gain = 0.0 if args.max_amp_only else processor.analyze_track_gain_db(path)
+                raw_gain = (
+                    0.0 if args.max_amp_only else processor.analyze_track_gain_db(path)
+                )
                 max_amp = processor.analyze_max_amplitude(path)
                 min_gain, max_gain = processor.analyze_minmax_gain(path)
             if args.stored_tag_policy in {"recalc", "skip"}:
@@ -862,17 +925,24 @@ def main(argv: list[str] | None = None) -> int:
                 ):
                     raw_gain = original_tags.track_gain_db
             if not skip_tag_updates:
-                tag_dirty = _update_track_tags_from_analysis(
-                    tags,
-                    raw_gain_db=raw_gain,
-                    max_amp=max_amp,
-                    min_gain=min_gain,
-                    max_gain=max_gain,
-                    max_amp_only=args.max_amp_only,
-                ) or tag_dirty
+                tag_dirty = (
+                    _update_track_tags_from_analysis(
+                        tags,
+                        raw_gain_db=raw_gain,
+                        max_amp=max_amp,
+                        min_gain=min_gain,
+                        max_gain=max_gain,
+                        max_amp_only=args.max_amp_only,
+                    )
+                    or tag_dirty
+                )
 
         if args.max_amp_only:
-            base_gain = tags.track_gain_db if (args.stored_tag_policy == "auto" and tags.track_gain_db is not None) else 0.0
+            base_gain = (
+                tags.track_gain_db
+                if (args.stored_tag_policy == "auto" and tags.track_gain_db is not None)
+                else 0.0
+            )
         else:
             base_gain = raw_gain
         db_gain = base_gain + args.db_mod
@@ -886,14 +956,17 @@ def main(argv: list[str] | None = None) -> int:
             and (len(existing_paths) > 1 or args.apply_mode == "album")
             and not skip_tag_updates
         ):
-            tag_dirty = _update_album_tags_from_analysis(
-                tags,
-                album_gain_db=album_tag_gain,
-                album_max_amp=album_max_amp,
-                album_min_gain=album_min_gain,
-                album_max_gain=album_max_gain,
-                max_amp_only=args.max_amp_only,
-            ) or tag_dirty
+            tag_dirty = (
+                _update_album_tags_from_analysis(
+                    tags,
+                    album_gain_db=album_tag_gain,
+                    album_max_amp=album_max_amp,
+                    album_min_gain=album_min_gain,
+                    album_max_gain=album_max_gain,
+                    max_amp_only=args.max_amp_only,
+                )
+                or tag_dirty
+            )
 
         if len(existing_paths) == 1 and args.stored_tag_policy in {"skip", "recalc"}:
             single_track_album_override = (steps, db_gain, max_amp, min_gain, max_gain)
@@ -906,7 +979,11 @@ def main(argv: list[str] | None = None) -> int:
             max_no_clip = _max_no_clip_steps(max_amp)
             if max_no_clip is not None and applied_steps > max_no_clip:
                 applied_steps = max_no_clip
-        elif args.apply_mode == "track" and not args.clip_confirmed and _would_clip(max_amp, applied_steps):
+        elif (
+            args.apply_mode == "track"
+            and not args.clip_confirmed
+            and _would_clip(max_amp, applied_steps)
+        ):
             failures += 1
             if not args.quiet:
                 print(f"{path}\tERROR\tclipping risk; rerun with /c or /k")
@@ -920,7 +997,12 @@ def main(argv: list[str] | None = None) -> int:
                 )
             continue
 
-        if args.apply_mode == "album" and not args.auto_clip and not args.clip_confirmed and _would_clip(max_amp, applied_steps):
+        if (
+            args.apply_mode == "album"
+            and not args.auto_clip
+            and not args.clip_confirmed
+            and _would_clip(max_amp, applied_steps)
+        ):
             failures += 1
             if not args.quiet:
                 print(f"{path}\tERROR\tclipping risk; rerun with /c or /k")
@@ -938,7 +1020,9 @@ def main(argv: list[str] | None = None) -> int:
             if not args.table_output:
                 print(path)
                 print(f"Applying mp3 gain change of {applied_steps} to {path}...")
-            result = processor.apply_steps(path, left_steps=applied_steps, options=options)
+            result = processor.apply_steps(
+                path, left_steps=applied_steps, options=options
+            )
             if result.exit_code != 0:
                 failures += 1
                 if not args.quiet:
@@ -977,7 +1061,7 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f'Recommended "Track" dB change: {db_gain:.6f}\n'
                 f'Recommended "Track" mp3 gain change: {steps}\n'
-                f'Applied step dB (exact): {legacy_steps_to_db_exact(steps):.6f}'
+                f"Applied step dB (exact): {legacy_steps_to_db_exact(steps):.6f}"
             )
 
     if (

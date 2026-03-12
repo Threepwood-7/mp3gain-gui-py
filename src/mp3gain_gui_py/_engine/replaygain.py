@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from typing import TYPE_CHECKING
 
 from .coefficients import (
     AB_BUTTER,
@@ -26,19 +25,16 @@ from .coefficients import (
     STEPS_PER_DB,
 )
 
-if TYPE_CHECKING:
-    pass
-
 # ── Select filter backend at import time ───────────────────────────────────────
-_FilterFn = Callable[
-    [list[float], list[float], int, tuple[float, ...]], list[float]
-]
+_FilterFn = Callable[[list[float], list[float], int, tuple[float, ...]], list[float]]
 
 try:
     from . import filter_np as _filter_mod  # type: ignore[import-not-found]
+
     _NUMPY = True
 except ImportError:
     from . import filter_py as _filter_mod  # type: ignore[assignment]
+
     _NUMPY = False
 
 _filter_yule: _FilterFn = _filter_mod.filter_yule
@@ -58,8 +54,8 @@ class GainAnalyzer:
         ga = GainAnalyzer(44100)
         for left, right in decode_chunks(song):
             ga.analyze_samples(left, right, len(left))
-        track_gain = ga.get_title_gain()   # resets per-track state
-        album_gain = ga.get_album_gain()   # accumulated across all tracks
+        track_gain = ga.get_title_gain()  # resets per-track state
+        album_gain = ga.get_album_gain()  # accumulated across all tracks
     """
 
     def __init__(self, sample_rate: int) -> None:
@@ -69,16 +65,14 @@ class GainAnalyzer:
                 f"Supported: {sorted(FREQ_TO_INDEX)}"
             )
         self._freq_idx = FREQ_TO_INDEX[sample_rate]
-        self._sample_window: int = math.ceil(
-            sample_rate * RMS_WINDOW_TIME_MS / 1000.0
-        )
+        self._sample_window: int = math.ceil(sample_rate * RMS_WINDOW_TIME_MS / 1000.0)
 
         # IIR pre-buffers (last MAX_ORDER samples of each signal stage, per channel)
         self._l_in_pre: list[float] = [0.0] * MAX_ORDER
         self._r_in_pre: list[float] = [0.0] * MAX_ORDER
-        self._l_step_pre: list[float] = [0.0] * MAX_ORDER   # yule output history
+        self._l_step_pre: list[float] = [0.0] * MAX_ORDER  # yule output history
         self._r_step_pre: list[float] = [0.0] * MAX_ORDER
-        self._l_out_pre: list[float] = [0.0] * MAX_ORDER    # butter output history
+        self._l_out_pre: list[float] = [0.0] * MAX_ORDER  # butter output history
         self._r_out_pre: list[float] = [0.0] * MAX_ORDER
 
         # RMS window accumulators
@@ -139,7 +133,9 @@ class GainAnalyzer:
 
             # Update pre-buffers
             self._l_in_pre = (self._l_in_pre + left[pos : pos + batch])[-MAX_ORDER:]
-            self._r_in_pre = (self._r_in_pre + right_buf[pos : pos + batch])[-MAX_ORDER:]
+            self._r_in_pre = (self._r_in_pre + right_buf[pos : pos + batch])[
+                -MAX_ORDER:
+            ]
             self._l_step_pre = (self._l_step_pre + l_step)[-MAX_ORDER:]
             self._r_step_pre = (self._r_step_pre + r_step)[-MAX_ORDER:]
             self._l_out_pre = (self._l_out_pre + l_out)[-MAX_ORDER:]
@@ -154,8 +150,12 @@ class GainAnalyzer:
             remaining -= batch
 
             if self._totsamp == self._sample_window:
-                val = STEPS_PER_DB * 10.0 * math.log10(
-                    (self._lsum + self._rsum) / self._totsamp * 0.5 + 1.0e-37
+                val = (
+                    STEPS_PER_DB
+                    * 10.0
+                    * math.log10(
+                        (self._lsum + self._rsum) / self._totsamp * 0.5 + 1.0e-37
+                    )
                 )
                 ival = max(0, min(int(val), STEPS_PER_DB * MAX_DB - 1))
                 self._hist_a[ival] += 1

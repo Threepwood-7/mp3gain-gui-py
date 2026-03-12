@@ -3,16 +3,19 @@ from __future__ import annotations
 import math
 from concurrent.futures import Future
 from pathlib import Path
+from typing import TYPE_CHECKING, ClassVar
 
 import mp3gain_gui_py._workers.analyze_worker as analyze_worker_mod
 import mp3gain_gui_py._workers.gain_worker as gain_worker_mod
 import mp3gain_gui_py._workers.tag_worker as tag_worker_mod
-from _pytest.monkeypatch import MonkeyPatch
 from mp3gain_gui_py._legacy_exact.math import db_to_legacy_steps
 from mp3gain_gui_py._workers.analyze_worker import AnalyzeWorker
 from mp3gain_gui_py._workers.gain_worker import GainWorker
 from mp3gain_gui_py._workers.tag_worker import TagWorker
 from mp3gain_gui_py._workers.types import FileResult, WorkerRequest, WorkerResult
+
+if TYPE_CHECKING:
+    from _pytest.monkeypatch import MonkeyPatch
 
 
 class _FakeBridge:
@@ -37,7 +40,7 @@ class _FakeBridge:
 
 
 class _FakeProcessPoolExecutor:
-    instances: list[_FakeProcessPoolExecutor] = []
+    instances: ClassVar[list[_FakeProcessPoolExecutor]] = []
 
     def __init__(self, *, max_workers: int) -> None:
         self.max_workers = max_workers
@@ -67,7 +70,9 @@ class _FakeProcessPoolExecutor:
         return future
 
 
-def test_gain_worker_uses_process_pool_with_cpu_bound_max_workers(monkeypatch: MonkeyPatch) -> None:
+def test_gain_worker_uses_process_pool_with_cpu_bound_max_workers(
+    monkeypatch: MonkeyPatch,
+) -> None:
     paths = [Path(f"file_{i}.mp3") for i in range(8)]
     req = WorkerRequest(kind="undo", paths=paths)
     bridge = _FakeBridge()
@@ -75,7 +80,9 @@ def test_gain_worker_uses_process_pool_with_cpu_bound_max_workers(monkeypatch: M
 
     _FakeProcessPoolExecutor.instances.clear()
     monkeypatch.setattr(gain_worker_mod.os, "cpu_count", lambda: 4)
-    monkeypatch.setattr(gain_worker_mod, "ProcessPoolExecutor", _FakeProcessPoolExecutor)
+    monkeypatch.setattr(
+        gain_worker_mod, "ProcessPoolExecutor", _FakeProcessPoolExecutor
+    )
     monkeypatch.setattr(
         gain_worker_mod,
         "gain_file_task",
@@ -92,7 +99,9 @@ def test_gain_worker_uses_process_pool_with_cpu_bound_max_workers(monkeypatch: M
     assert len(_FakeProcessPoolExecutor.instances[0].submitted) == len(paths)
 
 
-def test_analyze_worker_album_merge_maps_group_gain_to_file_results(monkeypatch: MonkeyPatch) -> None:
+def test_analyze_worker_album_merge_maps_group_gain_to_file_results(
+    monkeypatch: MonkeyPatch,
+) -> None:
     paths = [
         Path(r"C:\tmp\a\one.mp3"),
         Path(r"C:\tmp\a\two.mp3"),
@@ -112,15 +121,21 @@ def test_analyze_worker_album_merge_maps_group_gain_to_file_results(monkeypatch:
 
     _FakeProcessPoolExecutor.instances.clear()
     monkeypatch.setattr(analyze_worker_mod.os, "cpu_count", lambda: 4)
-    monkeypatch.setattr(analyze_worker_mod, "ProcessPoolExecutor", _FakeProcessPoolExecutor)
+    monkeypatch.setattr(
+        analyze_worker_mod, "ProcessPoolExecutor", _FakeProcessPoolExecutor
+    )
 
-    def _fake_album_group_gain_task(path_texts: tuple[str, ...], *, max_amp_only: bool) -> tuple[tuple[str, ...], float | None]:
+    def _fake_album_group_gain_task(
+        path_texts: tuple[str, ...], *, max_amp_only: bool
+    ) -> tuple[tuple[str, ...], float | None]:
         _ = max_amp_only
         first = Path(path_texts[0]).parent.name.lower()
         gain = -3.0 if first == "a" else -6.0
         return path_texts, gain
 
-    monkeypatch.setattr(analyze_worker_mod, "album_group_gain_task", _fake_album_group_gain_task)
+    monkeypatch.setattr(
+        analyze_worker_mod, "album_group_gain_task", _fake_album_group_gain_task
+    )
     monkeypatch.setattr(
         analyze_worker_mod,
         "analyze_file_task",
@@ -147,7 +162,11 @@ def test_analyze_worker_album_merge_maps_group_gain_to_file_results(monkeypatch:
     assert by_name["three.mp3"].album_gain_db == -6.0
     assert by_name["one.mp3"].album_volume_db == 92.0
     assert by_name["three.mp3"].album_volume_db == 95.0
-    assert math.isclose(by_name["one.mp3"].clip_album or 0.0, 1000.0 * math.pow(10.0, -3.0 / 20.0), rel_tol=1e-9)
+    assert math.isclose(
+        by_name["one.mp3"].clip_album or 0.0,
+        1000.0 * math.pow(10.0, -3.0 / 20.0),
+        rel_tol=1e-9,
+    )
 
 
 def test_tag_worker_uses_process_pool(monkeypatch: MonkeyPatch) -> None:
@@ -162,7 +181,9 @@ def test_tag_worker_uses_process_pool(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(
         tag_worker_mod,
         "delete_tags_file_task",
-        lambda path_text, *, tag_mode="apev2": FileResult(path=Path(path_text), ok=True),
+        lambda path_text, *, tag_mode="apev2": FileResult(
+            path=Path(path_text), ok=True
+        ),
     )
 
     worker.run()
@@ -176,7 +197,9 @@ def test_tag_worker_uses_process_pool(monkeypatch: MonkeyPatch) -> None:
         assert kwargs.get("tag_mode") == "apev2"
 
 
-def test_gain_worker_forced_album_normalization_precomputes_group_steps(monkeypatch: MonkeyPatch) -> None:
+def test_gain_worker_forced_album_normalization_precomputes_group_steps(
+    monkeypatch: MonkeyPatch,
+) -> None:
     paths = [
         Path(r"C:\tmp\a\one.mp3"),
         Path(r"C:\tmp\a\two.mp3"),
@@ -197,15 +220,21 @@ def test_gain_worker_forced_album_normalization_precomputes_group_steps(monkeypa
 
     _FakeProcessPoolExecutor.instances.clear()
     monkeypatch.setattr(gain_worker_mod.os, "cpu_count", lambda: 4)
-    monkeypatch.setattr(gain_worker_mod, "ProcessPoolExecutor", _FakeProcessPoolExecutor)
+    monkeypatch.setattr(
+        gain_worker_mod, "ProcessPoolExecutor", _FakeProcessPoolExecutor
+    )
 
-    def _fake_album_group_gain_task(path_texts: tuple[str, ...], *, max_amp_only: bool) -> tuple[tuple[str, ...], float | None]:
+    def _fake_album_group_gain_task(
+        path_texts: tuple[str, ...], *, max_amp_only: bool
+    ) -> tuple[tuple[str, ...], float | None]:
         _ = max_amp_only
         first = Path(path_texts[0]).parent.name.lower()
         gain = 3.010299956639812 if first == "a" else -3.010299956639812
         return path_texts, gain
 
-    monkeypatch.setattr(gain_worker_mod, "album_group_gain_task", _fake_album_group_gain_task)
+    monkeypatch.setattr(
+        gain_worker_mod, "album_group_gain_task", _fake_album_group_gain_task
+    )
     monkeypatch.setattr(
         gain_worker_mod,
         "gain_file_task",
@@ -221,11 +250,12 @@ def test_gain_worker_forced_album_normalization_precomputes_group_steps(monkeypa
 
     apply_executor = _FakeProcessPoolExecutor.instances[1]
     submitted_by_path = {
-        Path(args[1]): kwargs
-        for _fn, args, kwargs in apply_executor.submitted
+        Path(args[1]): kwargs for _fn, args, kwargs in apply_executor.submitted
     }
     expected_a = db_to_legacy_steps(3.010299956639812) + db_to_legacy_steps(87.0 - 89.0)
-    expected_b = db_to_legacy_steps(-3.010299956639812) + db_to_legacy_steps(87.0 - 89.0)
+    expected_b = db_to_legacy_steps(-3.010299956639812) + db_to_legacy_steps(
+        87.0 - 89.0
+    )
     assert submitted_by_path[paths[0]]["forced_steps"] == expected_a
     assert submitted_by_path[paths[1]]["forced_steps"] == expected_a
     assert submitted_by_path[paths[2]]["forced_steps"] == expected_b
