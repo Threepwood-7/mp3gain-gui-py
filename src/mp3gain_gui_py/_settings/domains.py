@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from threep_commons.settings import SettingsDomainBase
 from . import normalize as _norm
 from .registry import SettingsRegistry
 
-if TYPE_CHECKING:
-    from .storage import SettingsStorage
 
-
-class UiSettingsDomain(SettingsRegistry):
-    def __init__(self, storage: SettingsStorage) -> None:
-        self._storage = storage
+class UiSettingsDomain(SettingsDomainBase, SettingsRegistry):
 
     @property
     def target_volume_db(self) -> float:
@@ -118,9 +112,7 @@ class UiSettingsDomain(SettingsRegistry):
         self._storage.set_value(self.WARN_ON_CLIP_KEY, bool(value))
 
 
-class OpsSettingsDomain(SettingsRegistry):
-    def __init__(self, storage: SettingsStorage) -> None:
-        self._storage = storage
+class OpsSettingsDomain(SettingsDomainBase, SettingsRegistry):
 
     @property
     def wrap_gain(self) -> bool:
@@ -166,9 +158,7 @@ class OpsSettingsDomain(SettingsRegistry):
         self._storage.set_value(self.APPLY_ZERO_STEP_KEY, bool(value))
 
 
-class SessionSettingsDomain(SettingsRegistry):
-    def __init__(self, storage: SettingsStorage) -> None:
-        self._storage = storage
+class SessionSettingsDomain(SettingsDomainBase, SettingsRegistry):
 
     @property
     def last_add_files_dir(self) -> str:
