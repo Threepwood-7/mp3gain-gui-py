@@ -44,6 +44,95 @@ def _set8_bits(data: bytearray, byte_off: int, bit_off: int, value: int) -> None
     data[byte_off + 1] = (data[byte_off + 1] & mask_right) | (v & 0xFF)
 
 
+def _skip_id3v2_tag(data: bytearray) -> int:
+    if data[:3] != b"ID3":
+        return 0
+    id3_size = (
+        (data[9] & 0x7F)
+        | ((data[8] & 0x7F) << 7)
+        | ((data[7] & 0x7F) << 14)
+        | ((data[6] & 0x7F) << 21)
+    )
+    return 10 + id3_size
+
+
+def _resolve_channel_delta(
+    *,
+    gain_delta: int,
+    gain_delta_right: int | None,
+    channel_index: int,
+    channel_count: int,
+) -> int:
+    if gain_delta_right is not None and channel_index % channel_count == 1:
+        return gain_delta_right
+    return gain_delta
+
+
+def _apply_channel_gain(
+    data: bytearray,
+    *,
+    frame_start: int,
+    byte_off: int,
+    bit_off: int,
+    delta: int,
+    wrap: bool,
+) -> bool:
+    abs_byte = frame_start + byte_off
+    if abs_byte + 1 >= len(data):
+        return False
+    gain = _peek8_bits(data, abs_byte, bit_off)
+    if wrap:
+        new_gain = (gain + delta) & 0xFF
+    else:
+        if gain == 0:
+            return False
+        new_gain = max(0, min(255, gain + delta))
+    _set8_bits(data, abs_byte, bit_off, new_gain)
+    return True
+
+
+def _update_frame_global_gain(
+    data: bytearray,
+    *,
+    frame_start: int,
+    gain_delta: int,
+    gain_delta_right: int | None,
+    wrap: bool,
+) -> tuple[int, bool]:
+    header = parse_frame_header(data, frame_start)
+    if header is None:
+        return find_next_frame(data, frame_start + 1), False
+    if frame_start + header.frame_size_bytes > len(data):
+        return -1, False
+
+    changed = False
+    for ch_idx, (byte_off, bit_off) in enumerate(global_gain_offsets(header)):
+        delta = _resolve_channel_delta(
+            gain_delta=gain_delta,
+            gain_delta_right=gain_delta_right,
+            channel_index=ch_idx,
+            channel_count=header.num_channels,
+        )
+        if _apply_channel_gain(
+            data,
+            frame_start=frame_start,
+            byte_off=byte_off,
+            bit_off=bit_off,
+            delta=delta,
+            wrap=wrap,
+        ):
+            changed = True
+
+    if changed and header.crc_protected:
+        _recalc_crc(
+            data,
+            frame_start,
+            header.mpeg_version == 0x03,
+            header.num_channels == 1,
+        )
+    return frame_start + header.frame_size_bytes, changed
+
+
 def apply_gain_change(
     path: Path,
     gain_delta: int,
@@ -77,26 +166,14 @@ def apply_gain_change(
         mtime = path.stat().st_mtime
 
     data = bytearray(path.read_bytes())
-
-    pos = 0
-    # Skip ID3v2
-    if data[:3] == b"ID3":
-        id3_size = (
-            (data[9] & 0x7F)
-            | ((data[8] & 0x7F) << 7)
-            | ((data[7] & 0x7F) << 14)
-            | ((data[6] & 0x7F) << 21)
-        )
-        pos = 10 + id3_size
+    pos = _skip_id3v2_tag(data)
 
     first_audio_frame = True
-
     pos = find_next_frame(data, pos)
     while pos >= 0:
         header = parse_frame_header(data, pos)
         if header is None:
-            pos += 1
-            pos = find_next_frame(data, pos)
+            pos = find_next_frame(data, pos + 1)
             continue
         if pos + header.frame_size_bytes > len(data):
             break
@@ -108,38 +185,16 @@ def apply_gain_change(
                 pos += header.frame_size_bytes
                 continue
 
-        offsets = global_gain_offsets(header)
-
-        changed = False
-        for ch_idx, (byte_off, bit_off) in enumerate(offsets):
-            abs_byte = pos + byte_off
-            if abs_byte + 1 >= len(data):
-                continue
-
-            delta = gain_delta
-            if gain_delta_right is not None and ch_idx % header.num_channels == 1:
-                delta = gain_delta_right
-
-            gain = _peek8_bits(data, abs_byte, bit_off)
-
-            if wrap:
-                new_gain = (gain + delta) & 0xFF
-            else:
-                if gain == 0:
-                    continue  # skip silence frames
-                new_gain = max(0, min(255, gain + delta))
-
-            _set8_bits(data, abs_byte, bit_off, new_gain)
-            changed = True
-
-        # Recalculate CRC if the frame is CRC-protected and we changed something
-        if changed and header.crc_protected:
-            _recalc_crc(
-                data, pos, header.mpeg_version == 0x03, header.num_channels == 1
-            )
-
-        pos += header.frame_size_bytes
-        pos = find_next_frame(data, pos)
+        next_pos, _changed = _update_frame_global_gain(
+            data,
+            frame_start=pos,
+            gain_delta=gain_delta,
+            gain_delta_right=gain_delta_right,
+            wrap=wrap,
+        )
+        if next_pos < 0:
+            break
+        pos = find_next_frame(data, next_pos)
 
     output = bytes(data)
     if use_temp_file:

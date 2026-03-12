@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import os
+from collections.abc import Iterable
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -38,10 +39,108 @@ class AnalyzeWorker:
         return min(max(1, os.cpu_count() or 1), max(1, total))
 
     @staticmethod
-    def _cancel_pending_futures(futures: dict[Future[FileResult], Path]) -> None:
+    def _cancel_pending_futures(futures: Iterable[Future[object]]) -> None:
         for future in futures:
             if not future.done():
                 future.cancel()
+
+    def _collect_album_gain_map(
+        self,
+        *,
+        group_items: list[list[Path]],
+        max_amp_only: bool,
+    ) -> tuple[dict[Path, float | None], bool]:
+        album_gain_by_path: dict[Path, float | None] = {}
+        cancelled = False
+        group_futures: dict[
+            Future[tuple[tuple[str, ...], float | None]], tuple[Path, ...]
+        ] = {}
+        with ProcessPoolExecutor(
+            max_workers=self._max_workers(len(group_items))
+        ) as group_executor:
+            for group_paths in group_items:
+                if self._bridge.is_cancelled:
+                    return album_gain_by_path, True
+                path_texts = tuple(str(path) for path in group_paths)
+                future = group_executor.submit(
+                    album_group_gain_task,
+                    path_texts,
+                    max_amp_only=max_amp_only,
+                )
+                group_futures[future] = tuple(group_paths)
+
+            for future in as_completed(group_futures):
+                if self._bridge.is_cancelled and not cancelled:
+                    cancelled = True
+                    self._cancel_pending_futures(group_futures)
+                if future.cancelled():
+                    continue
+                try:
+                    path_texts, album_raw_db = future.result()
+                except Exception:
+                    continue
+                for path_text in path_texts:
+                    album_gain_by_path[Path(path_text)] = album_raw_db
+        return album_gain_by_path, cancelled
+
+    def _run_album_track_jobs(
+        self,
+        *,
+        paths: list[Path],
+        total: int,
+        target_db: float,
+        max_amp_only: bool,
+        stored_tag_policy: str,
+        cancelled: bool,
+        album_gain_by_path: dict[Path, float | None],
+    ) -> tuple[int, int, int, bool]:
+        succeeded = 0
+        failed = 0
+        processed = 0
+        futures: dict[Future[FileResult], Path] = {}
+        with ProcessPoolExecutor(max_workers=self._max_workers(total)) as executor:
+            for path in paths:
+                if cancelled or self._bridge.is_cancelled:
+                    cancelled = True
+                    break
+                self._bridge._relay_file_started(path)
+                future = executor.submit(
+                    analyze_file_task,
+                    str(path),
+                    target_db=target_db,
+                    max_amp_only=max_amp_only,
+                    stored_tag_policy=stored_tag_policy,
+                )
+                futures[future] = path
+
+            for future in as_completed(futures):
+                if self._bridge.is_cancelled and not cancelled:
+                    cancelled = True
+                    self._cancel_pending_futures(futures)
+                path = futures[future]
+                if future.cancelled():
+                    continue
+                try:
+                    result = future.result()
+                except Exception as exc:  # pragma: no cover - defensive
+                    result = FileResult(path=path, ok=False, error_msg=str(exc))
+
+                album_raw_db = album_gain_by_path.get(path)
+                if result.ok and album_raw_db is not None:
+                    result = self._with_album_fields(
+                        result,
+                        target_db=target_db,
+                        album_raw_db=album_raw_db,
+                    )
+
+                if result.ok:
+                    succeeded += 1
+                else:
+                    failed += 1
+                processed += 1
+                self._bridge._relay_file_done(result)
+                self._bridge._relay_progress(processed, total)
+        return succeeded, failed, processed, cancelled
 
     def _run_track(self, *, paths: list[Path], total: int) -> None:
         req = self._request
@@ -97,91 +196,21 @@ class AnalyzeWorker:
 
     def _run_album(self, *, paths: list[Path], total: int) -> None:
         req = self._request
-        succeeded = 0
-        failed = 0
-        cancelled = False
-        processed = 0
-
-        album_gain_by_path: dict[Path, float | None] = {}
         groups = req.album_groups if req.album_groups else self._group_by_parent(paths)
         group_items = list(groups.values())
-
-        group_futures: dict[
-            Future[tuple[tuple[str, ...], float | None]], tuple[Path, ...]
-        ] = {}
-        with ProcessPoolExecutor(
-            max_workers=self._max_workers(len(group_items))
-        ) as group_executor:
-            for group_paths in group_items:
-                if self._bridge.is_cancelled:
-                    cancelled = True
-                    break
-                path_texts = tuple(str(path) for path in group_paths)
-                future = group_executor.submit(
-                    album_group_gain_task,
-                    path_texts,
-                    max_amp_only=req.max_amp_only,
-                )
-                group_futures[future] = tuple(group_paths)
-
-            for future in as_completed(group_futures):
-                if self._bridge.is_cancelled and not cancelled:
-                    cancelled = True
-                    for pending in group_futures:
-                        if not pending.done():
-                            pending.cancel()
-                if future.cancelled():
-                    continue
-                try:
-                    path_texts, album_raw_db = future.result()
-                except Exception:
-                    continue
-                for path_text in path_texts:
-                    album_gain_by_path[Path(path_text)] = album_raw_db
-
-        futures: dict[Future[FileResult], Path] = {}
-        with ProcessPoolExecutor(max_workers=self._max_workers(total)) as executor:
-            for path in paths:
-                if cancelled or self._bridge.is_cancelled:
-                    cancelled = True
-                    break
-                self._bridge._relay_file_started(path)
-                future = executor.submit(
-                    analyze_file_task,
-                    str(path),
-                    target_db=req.target_db,
-                    max_amp_only=req.max_amp_only,
-                    stored_tag_policy=req.stored_tag_policy,
-                )
-                futures[future] = path
-
-            for future in as_completed(futures):
-                if self._bridge.is_cancelled and not cancelled:
-                    cancelled = True
-                    self._cancel_pending_futures(futures)
-                path = futures[future]
-                if future.cancelled():
-                    continue
-                try:
-                    result = future.result()
-                except Exception as exc:  # pragma: no cover - defensive
-                    result = FileResult(path=path, ok=False, error_msg=str(exc))
-
-                album_raw_db = album_gain_by_path.get(path)
-                if result.ok and album_raw_db is not None:
-                    result = self._with_album_fields(
-                        result,
-                        target_db=req.target_db,
-                        album_raw_db=album_raw_db,
-                    )
-
-                if result.ok:
-                    succeeded += 1
-                else:
-                    failed += 1
-                processed += 1
-                self._bridge._relay_file_done(result)
-                self._bridge._relay_progress(processed, total)
+        album_gain_by_path, cancelled = self._collect_album_gain_map(
+            group_items=group_items,
+            max_amp_only=req.max_amp_only,
+        )
+        succeeded, failed, _processed, cancelled = self._run_album_track_jobs(
+            paths=paths,
+            total=total,
+            target_db=req.target_db,
+            max_amp_only=req.max_amp_only,
+            stored_tag_policy=req.stored_tag_policy,
+            cancelled=cancelled,
+            album_gain_by_path=album_gain_by_path,
+        )
 
         self._bridge._relay_all_done(
             WorkerResult(
