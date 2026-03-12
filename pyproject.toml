@@ -161,7 +161,7 @@ indent-style = "space"
 docstring-code-format = true
 
 [tool.deptry]
-known_first_party = ["mp3gain_gui_py"]
+known_first_party = ["mp3gain_gui_py", "_common"]
 
 [tool.basedpyright]
 pythonVersion = "3.13"
