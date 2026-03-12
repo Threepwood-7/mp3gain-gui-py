@@ -31,6 +31,7 @@ dependencies = [
 
 [project.optional-dependencies]
 fast = ["numpy>=1.26"]
+parity = ["openpyxl>=3.1"]
 
 [project.urls]
 Homepage = "https://github.com/Threepwood-7/mp3gain-gui-py"
@@ -161,7 +162,7 @@ indent-style = "space"
 docstring-code-format = true
 
 [tool.deptry]
-known_first_party = ["mp3gain_gui_py", "_common"]
+known_first_party = ["mp3gain_gui_py", "_common", "parity_common"]
 
 [tool.basedpyright]
 pythonVersion = "3.13"
