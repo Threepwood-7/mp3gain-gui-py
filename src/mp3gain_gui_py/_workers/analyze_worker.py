@@ -6,10 +6,10 @@ import math
 import os
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .process_tasks import album_group_gain_task, analyze_file_task
-from .types import FileResult, WorkerRequest, WorkerResult
+from .types import FileResult, StoredTagPolicy, WorkerRequest, WorkerResult
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -40,7 +40,7 @@ class AnalyzeWorker:
         return min(max(1, os.cpu_count() or 1), max(1, total))
 
     @staticmethod
-    def _cancel_pending_futures(futures: Iterable[Future[object]]) -> None:
+    def _cancel_pending_futures(futures: Iterable[Future[Any]]) -> None:
         for future in futures:
             if not future.done():
                 future.cancel()
@@ -91,7 +91,7 @@ class AnalyzeWorker:
         total: int,
         target_db: float,
         max_amp_only: bool,
-        stored_tag_policy: str,
+        stored_tag_policy: StoredTagPolicy,
         cancelled: bool,
         album_gain_by_path: dict[Path, float | None],
     ) -> tuple[int, int, int, bool]:
@@ -104,7 +104,7 @@ class AnalyzeWorker:
                 if cancelled or self._bridge.is_cancelled:
                     cancelled = True
                     break
-                self._bridge._relay_file_started(path)
+                self._bridge.relay_file_started(path)
                 future = executor.submit(
                     analyze_file_task,
                     str(path),
@@ -139,8 +139,8 @@ class AnalyzeWorker:
                 else:
                     failed += 1
                 processed += 1
-                self._bridge._relay_file_done(result)
-                self._bridge._relay_progress(processed, total)
+                self._bridge.relay_file_done(result)
+                self._bridge.relay_progress(processed, total)
         return succeeded, failed, processed, cancelled
 
     def _run_track(self, *, paths: list[Path], total: int) -> None:
@@ -156,7 +156,7 @@ class AnalyzeWorker:
                 if self._bridge.is_cancelled:
                     cancelled = True
                     break
-                self._bridge._relay_file_started(path)
+                self._bridge.relay_file_started(path)
                 future = executor.submit(
                     analyze_file_task,
                     str(path),
@@ -182,10 +182,10 @@ class AnalyzeWorker:
                 else:
                     failed += 1
                 processed += 1
-                self._bridge._relay_file_done(result)
-                self._bridge._relay_progress(processed, total)
+                self._bridge.relay_file_done(result)
+                self._bridge.relay_progress(processed, total)
 
-        self._bridge._relay_all_done(
+        self._bridge.relay_all_done(
             WorkerResult(
                 kind=req.kind,
                 total=total,
@@ -213,7 +213,7 @@ class AnalyzeWorker:
             album_gain_by_path=album_gain_by_path,
         )
 
-        self._bridge._relay_all_done(
+        self._bridge.relay_all_done(
             WorkerResult(
                 kind=req.kind,
                 total=total,

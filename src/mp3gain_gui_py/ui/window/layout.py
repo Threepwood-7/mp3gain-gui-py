@@ -105,8 +105,6 @@ class WindowLayoutCoordinator:
 
     def selected_rows(self) -> list[int]:
         sel = self.file_view.selectionModel()
-        if sel is None:
-            return []
         return sorted({idx.row() for idx in sel.selectedIndexes()})
 
     def accept_drops(self, enable: bool = True) -> None:

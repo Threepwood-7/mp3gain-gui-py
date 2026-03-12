@@ -112,7 +112,7 @@ class GainWorker:
                 if cancelled or self._bridge.is_cancelled:
                     cancelled = True
                     break
-                self._bridge._relay_file_started(path)
+                self._bridge.relay_file_started(path)
                 future = executor.submit(
                     gain_file_task,
                     req.kind,
@@ -143,10 +143,10 @@ class GainWorker:
                 else:
                     failed += 1
                 processed += 1
-                self._bridge._relay_file_done(result)
-                self._bridge._relay_progress(processed, total)
+                self._bridge.relay_file_done(result)
+                self._bridge.relay_progress(processed, total)
 
-        self._bridge._relay_all_done(
+        self._bridge.relay_all_done(
             WorkerResult(
                 kind=req.kind,
                 total=total,

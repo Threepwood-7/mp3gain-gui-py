@@ -436,11 +436,7 @@ def _resolve_single_track_album_summary(
     processor: LegacyExactProcessor,
     existing_paths: list[Path],
 ) -> TagData | None:
-    if (
-        len(existing_paths) != 1
-        or args.stored_tag_policy != "auto"
-        or args.stored_tag_policy == "recalc"
-    ):
+    if len(existing_paths) != 1 or args.stored_tag_policy != "auto":
         return None
     candidate = _load_runtime_tags(
         processor, existing_paths[0], tag_format=args.tag_format
@@ -493,16 +489,15 @@ def _prepare_album_summary(
         existing_paths=existing_paths,
     )
     if single_existing is not None:
+        peak_value = single_existing.track_peak
+        if peak_value is None:
+            peak_value = single_existing.album_peak
         summary.tag_gain = (
             single_existing.album_gain_db
             if single_existing.album_gain_db is not None
             else single_existing.track_gain_db or 0.0
         )
-        summary.max_amp = (
-            single_existing.track_peak
-            if single_existing.track_peak is not None
-            else single_existing.album_peak
-        ) * 32768.0
+        summary.max_amp = 0.0 if peak_value is None else peak_value * 32768.0
         summary.min_gain = (
             single_existing.min_gain
             if single_existing.min_gain is not None
@@ -527,12 +522,7 @@ def _prepare_album_summary(
 
     summary.db_gain = summary.tag_gain + args.db_mod
     summary.steps = db_to_legacy_steps(summary.db_gain, mp3_gain_mod=args.mp3_gain_mod)
-    if (
-        args.apply_mode == "album"
-        and args.auto_clip
-        and summary.steps is not None
-        and summary.max_amp is not None
-    ):
+    if args.apply_mode == "album" and args.auto_clip:
         max_no_clip = _max_no_clip_steps(summary.max_amp)
         if max_no_clip is not None and summary.steps > max_no_clip:
             summary.steps = max_no_clip
@@ -775,7 +765,6 @@ def _resolve_track_metrics(
         and tags.track_peak is not None
         and tags.min_gain is not None
         and tags.max_gain is not None
-        and args.stored_tag_policy != "recalc"
     )
     used_skip_fallback = (
         args.stored_tag_policy == "skip"
@@ -961,17 +950,6 @@ def _default_options(args: _LegacyCliArgs) -> LegacyCompatOptions:
         tag_format=args.tag_format,
         stored_tag_policy=args.stored_tag_policy,
     )
-
-
-def _tags_to_metrics(
-    tags: TagData, *, mp3_gain_mod: int
-) -> tuple[int, float, float, int, int]:
-    track_gain = tags.track_gain_db if tags.track_gain_db is not None else 0.0
-    steps = db_to_legacy_steps(track_gain, mp3_gain_mod=mp3_gain_mod)
-    max_amp = (tags.track_peak or 0.0) * 32768.0
-    min_gain = tags.min_gain if tags.min_gain is not None else 0
-    max_gain = tags.max_gain if tags.max_gain is not None else 0
-    return steps, track_gain, max_amp, min_gain, max_gain
 
 
 def _format_table_line(

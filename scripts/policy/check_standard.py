@@ -720,7 +720,10 @@ def main() -> int:
             [
                 p
                 for p in src_root.iterdir()
-                if p.is_dir() and not p.name.startswith(".") and p.name != "__pycache__"
+                if p.is_dir()
+                and not p.name.startswith(".")
+                and p.name != "__pycache__"
+                and p.name not in ALLOWED_NON_PACKAGE_SRC_DIRS
             ]
         )
 

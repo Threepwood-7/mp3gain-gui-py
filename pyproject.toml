@@ -192,7 +192,7 @@ indent-style = "space"
 docstring-code-format = true
 
 [tool.deptry]
-known_first_party = ["mp3gain_gui_py", "_common"]
+known_first_party = ["mp3gain_gui_py", "_common", "parity_common"]
 
 [tool.basedpyright]
 pythonVersion = "3.13"
@@ -204,7 +204,6 @@ reportArgumentType = "none"
 reportAssignmentType = "none"
 reportAttributeAccessIssue = "none"
 reportCallIssue = "none"
-reportConstantRedefinition = "none"
 reportGeneralTypeIssues = "none"
 reportIncompatibleMethodOverride = "none"
 reportIncompatibleVariableOverride = "none"
@@ -215,11 +214,9 @@ reportMissingParameterType = "none"
 reportMissingTypeArgument = "none"
 reportMissingTypeStubs = "none"
 reportOptionalMemberAccess = "none"
-reportOptionalOperand = "none"
 reportOptionalSubscript = "none"
 reportPossiblyUnboundVariable = "none"
 reportPrivateImportUsage = "none"
-reportPrivateUsage = "none"
 reportRedeclaration = "none"
 reportReturnType = "none"
 reportUnknownArgumentType = "none"
@@ -228,9 +225,7 @@ reportUnknownMemberType = "none"
 reportUnknownParameterType = "none"
 reportUnknownVariableType = "none"
 reportUnnecessaryCast = "none"
-reportUnnecessaryComparison = "none"
 reportUnnecessaryIsInstance = "none"
-reportUnusedFunction = "none"
 venvPath = "."
 venv = ".venv"
 include = ["src"]

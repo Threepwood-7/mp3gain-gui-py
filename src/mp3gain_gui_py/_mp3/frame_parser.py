@@ -58,7 +58,7 @@ class FrameHeader:
     frame_size_bytes: int  # total frame size in bytes (header + data)
 
 
-def parse_frame_header(data: bytes, offset: int) -> FrameHeader | None:
+def parse_frame_header(data: bytes | bytearray, offset: int) -> FrameHeader | None:
     """Parse a 4-byte MPEG frame header at ``data[offset]``.
 
     Returns ``None`` if the header is not a valid MPEG Layer III frame.
@@ -127,7 +127,7 @@ def parse_frame_header(data: bytes, offset: int) -> FrameHeader | None:
     )
 
 
-def find_next_frame(data: bytes, start: int) -> int:
+def find_next_frame(data: bytes | bytearray, start: int) -> int:
     """Return offset of the next valid MPEG Layer III sync word at or after ``start``.
 
     Returns ``-1`` if none found.
@@ -210,7 +210,9 @@ def global_gain_offsets(header: FrameHeader) -> list[tuple[int, int]]:
     return results
 
 
-def has_xing_or_info_tag(data: bytes, frame_offset: int, header: FrameHeader) -> bool:
+def has_xing_or_info_tag(
+    data: bytes | bytearray, frame_offset: int, header: FrameHeader
+) -> bool:
     """Return True if *header* frame carries a Xing/Info VBR header marker.
 
     Legacy pointer: LEGACY_PTR:MP3_SKIP_XING_INFO.

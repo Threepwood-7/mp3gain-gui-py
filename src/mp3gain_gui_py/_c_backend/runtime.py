@@ -6,7 +6,7 @@ import ctypes
 import threading
 from ctypes import POINTER, byref, c_char_p, c_double, c_int, c_long, c_size_t
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, Literal
 
 from .._tags.reader import TagData
 from .build import backend_dll_path, build_backend
@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 TAG_FORMAT_NONE: Final[int] = 0
 TAG_FORMAT_APEV2: Final[int] = 1
 TAG_FORMAT_ID3: Final[int] = 2
+TagFormatValue = Literal["apev2", "id3", "none"]
+WritableTagFormat = Literal["apev2", "id3"]
 
 
 class CBackendError(RuntimeError):
@@ -309,7 +311,7 @@ class LegacyCBackend:
                 )
 
     @staticmethod
-    def _tag_format_to_int(tag_format: str) -> int:
+    def _tag_format_to_int(tag_format: TagFormatValue) -> int:
         if tag_format == "apev2":
             return TAG_FORMAT_APEV2
         if tag_format == "id3":
@@ -317,7 +319,7 @@ class LegacyCBackend:
         return TAG_FORMAT_NONE
 
     @staticmethod
-    def _int_to_tag_format(value: int) -> str:
+    def _int_to_tag_format(value: int) -> TagFormatValue:
         if value == TAG_FORMAT_APEV2:
             return "apev2"
         if value == TAG_FORMAT_ID3:
@@ -358,7 +360,7 @@ class LegacyCBackend:
         path: Path,
         tags: TagData,
         *,
-        tag_format: str,
+        tag_format: WritableTagFormat,
         preserve_timestamp: bool,
     ) -> None:
         path_bytes = self._encode_path(path)
@@ -404,7 +406,11 @@ class LegacyCBackend:
                 )
 
     def delete_tags(
-        self, path: Path, *, tag_format: str | None, preserve_timestamp: bool
+        self,
+        path: Path,
+        *,
+        tag_format: WritableTagFormat | None,
+        preserve_timestamp: bool,
     ) -> None:
         path_bytes = self._encode_path(path)
         fmt = (

@@ -31,16 +31,16 @@ _FilterFn = Callable[[list[float], list[float], int, tuple[float, ...]], list[fl
 try:
     from . import filter_np as _filter_mod  # type: ignore[import-not-found]
 
-    _NUMPY = True
+    _using_numpy_backend = True
 except ImportError:
     from . import filter_py as _filter_mod  # type: ignore[assignment]
 
-    _NUMPY = False
+    _using_numpy_backend = False
 
 _filter_yule: _FilterFn = _filter_mod.filter_yule
 _filter_butter: _FilterFn = _filter_mod.filter_butter
 
-USING_NUMPY: bool = _NUMPY
+USING_NUMPY: bool = _using_numpy_backend
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────

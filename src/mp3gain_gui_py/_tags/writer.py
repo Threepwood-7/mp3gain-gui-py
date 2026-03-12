@@ -94,9 +94,10 @@ def _write_id3(path: Path, data: TagData) -> None:
         tags = _id3.ID3()
 
     kv = _build_kv(data)
+    txxx_frame = _id3.Frames["TXXX"]
     for key, value in kv.items():
         frame_key = f"TXXX:{key}"
-        tags[frame_key] = _id3.TXXX(encoding=3, desc=key, text=[value])
+        tags[frame_key] = txxx_frame(encoding=3, desc=key, text=[value])
 
     tags.save(str(path))
 

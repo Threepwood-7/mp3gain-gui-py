@@ -4,21 +4,22 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from typing import Literal, cast
 
 from .._legacy_exact.math import db_to_legacy_steps
 from .._legacy_exact.processor import LegacyCompatOptions, LegacyExactProcessor
 from .._tags.reader import read_tags
 from .types import FileResult, StoredTagPolicy
 
-_PROCESSOR: LegacyExactProcessor | None = None
+_processor_instance: LegacyExactProcessor | None = None
 _LEGACY_TARGET_DB = 89.0
 
 
 def _get_processor() -> LegacyExactProcessor:
-    global _PROCESSOR
-    if _PROCESSOR is None:
-        _PROCESSOR = LegacyExactProcessor()
-    return _PROCESSOR
+    global _processor_instance
+    if _processor_instance is None:
+        _processor_instance = LegacyExactProcessor()
+    return _processor_instance
 
 
 def _db_to_linear(db: float) -> float:
@@ -214,7 +215,11 @@ def delete_tags_file_task(
 ) -> FileResult:
     path = Path(path_text)
     try:
-        tag_format = tag_mode if tag_mode in {"apev2", "id3"} else None
+        tag_format: Literal["apev2", "id3"] | None
+        if tag_mode in {"apev2", "id3"}:
+            tag_format = cast("Literal['apev2', 'id3']", tag_mode)
+        else:
+            tag_format = None
         result = _get_processor().delete_mp3gain_tags(path, tag_format=tag_format)
         if result.exit_code != 0:
             return FileResult(path=path, ok=False, error_msg=result.message)

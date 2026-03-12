@@ -72,19 +72,19 @@ class WorkerBridge(QObject):
     # ── Relay methods called from worker threads ───────────────────────────────
     # Qt AutoConnection queues to the bridge's (main) thread automatically.
 
-    def _relay_file_started(self, path: Path) -> None:
+    def relay_file_started(self, path: Path) -> None:
         self.file_started.emit(path)
 
-    def _relay_file_done(self, result: FileResult) -> None:
+    def relay_file_done(self, result: FileResult) -> None:
         self.file_done.emit(result)
 
-    def _relay_progress(self, completed: int, total: int) -> None:
+    def relay_progress(self, completed: int, total: int) -> None:
         self.progress.emit(completed, total)
 
-    def _relay_all_done(self, result: WorkerResult) -> None:
+    def relay_all_done(self, result: WorkerResult) -> None:
         with self._lock:
             self._active = False
         self.all_done.emit(result)
 
-    def _relay_error(self, msg: str) -> None:
+    def relay_error(self, msg: str) -> None:
         self.error.emit(msg)

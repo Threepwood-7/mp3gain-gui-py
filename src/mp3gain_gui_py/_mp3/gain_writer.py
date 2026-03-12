@@ -45,7 +45,7 @@ def _set8_bits(data: bytearray, byte_off: int, bit_off: int, value: int) -> None
 
 
 def _skip_id3v2_tag(data: bytearray) -> int:
-    if data[:3] != b"ID3":
+    if bytes(data[:3]) != b"ID3":
         return 0
     id3_size = (
         (data[9] & 0x7F)

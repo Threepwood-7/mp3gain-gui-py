@@ -47,7 +47,7 @@ class TagWorker:
                 if self._bridge.is_cancelled:
                     cancelled = True
                     break
-                self._bridge._relay_file_started(path)
+                self._bridge.relay_file_started(path)
                 future = executor.submit(
                     delete_tags_file_task,
                     str(path),
@@ -71,10 +71,10 @@ class TagWorker:
                 else:
                     failed += 1
                 processed += 1
-                self._bridge._relay_file_done(result)
-                self._bridge._relay_progress(processed, total)
+                self._bridge.relay_file_done(result)
+                self._bridge.relay_progress(processed, total)
 
-        self._bridge._relay_all_done(
+        self._bridge.relay_all_done(
             WorkerResult(
                 kind=req.kind,
                 total=total,
