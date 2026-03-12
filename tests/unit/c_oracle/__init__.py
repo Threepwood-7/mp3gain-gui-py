@@ -8,7 +8,7 @@ from ctypes import c_double, c_int
 from pathlib import Path
 from typing import Final
 
-REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
+REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 C_ORACLE_SOURCE: Final[Path] = (
     REPO_ROOT / "tests" / "unit" / "c_oracle" / "legacy_math_oracle.c"
 )

@@ -91,13 +91,12 @@ def apply_gain_change(
 
     first_audio_frame = True
 
-    while True:
-        pos = find_next_frame(data, pos)
-        if pos < 0:
-            break
+    pos = find_next_frame(data, pos)
+    while pos >= 0:
         header = parse_frame_header(data, pos)
         if header is None:
             pos += 1
+            pos = find_next_frame(data, pos)
             continue
         if pos + header.frame_size_bytes > len(data):
             break
@@ -140,6 +139,7 @@ def apply_gain_change(
             )
 
         pos += header.frame_size_bytes
+        pos = find_next_frame(data, pos)
 
     output = bytes(data)
     if use_temp_file:

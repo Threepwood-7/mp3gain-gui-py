@@ -1,4 +1,4 @@
-"""Import-level smoke tests for the package."""
+"""Tests for mp3gain_gui_py."""
 
 import importlib
 

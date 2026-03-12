@@ -14,12 +14,12 @@
 - Reworked `scripts/run_normalize.py` normalization flow to match legacy two-step command execution (`/q /o /s r` analyze, then `/q /g <steps> /t` apply when non-zero), with `--db` implemented via legacy step-offset math (`db_to_legacy_steps(target_db - 89.0)`).
 - Renamed `scripts/normalize_89db.py` to `scripts/run_normalize.py`; added configurable `--db` target loudness and `--jobs` parallelism (default: CPU count), while keeping default target at 89 dB.
 - Sanitized README performance report by removing real song titles and replacing them with anonymized sample filenames.
-- Added full README documentation for VB6 legacy GUI source delta analysis between `src/vbs/legacy/mp3gain-win-gui-1_2_5-src` and `src/vbs/legacy/mp3gain-win-gui-1_3_4-src` (inventory, file-level churn, and behavioral differences).
+- Added full README documentation for VB6 legacy GUI source delta analysis between the primary and secondary imported VB6 snapshots (inventory, file-level churn, and behavioral differences).
 - Migrated the full contents of `PERF.md` into README as a dedicated C-backend performance/parity report section and removed standalone `PERF.md`.
-- Added a full README comparison section documenting `src/c/legacy/mp3gain-1_5_2-src` versus `src/c/legacy/mp3gain-1_6_2-src` (file inventory, path-level deltas, core behavioral/build differences, and migration impact notes).
-- Imported VB6 GUI legacy upstream source snapshots `c:/prj/misc/mp3gain/mp3gain-win-gui-1_2_5-src` and `c:/prj/misc/mp3gain/mp3gain-win-gui-1_3_4-src` into `src/vbs/legacy/`, normalized to UTF-8 (no BOM) and LF-only line endings.
+- Added a full README comparison section documenting the primary versus secondary imported C snapshots (file inventory, path-level deltas, core behavioral/build differences, and migration impact notes).
+- Imported VB6 GUI legacy upstream source snapshots from the primary and secondary legacy source trees into `src/vbs/legacy/`, normalized to UTF-8 (no BOM) and LF-only line endings.
 - Versioned the generated C backend DLL artifact name using the vendored source tree version suffix (for current runtime source `mp3gain-1_5_2-src`, output is now `mp3gain_legacy_backend-1_5_2.dll`).
-- Imported legacy upstream source snapshot `c:/prj/misc/mp3gain/mp3gain-1_6_2-src` into `src/c/legacy/mp3gain-1_6_2-src`, normalized to UTF-8 (no BOM) and LF-only line endings.
+- Imported the secondary legacy upstream C snapshot into `src/c/legacy/`, normalized to UTF-8 (no BOM) and LF-only line endings.
 - Relocated vendored legacy C sources from `src/c/legacy` to `src/c/legacy/mp3gain-1_5_2-src` and updated backend build/runtime documentation pointers to the nested source root.
 - Replaced `PERF.md` baseline content with the latest DLL-backed `legacy_cli` parity/performance execution report (6 random files), superseding the earlier python-only baseline metrics.
 - Normalized the vendored legacy C source tree (`src/c/legacy/mp3gain-1_5_2-src`) to UTF-8 encoding (no BOM) with LF-only line endings.

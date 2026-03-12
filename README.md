@@ -387,12 +387,12 @@ python -m mp3gain_gui_py.legacy_cli /q /r /c /s r /m 1 "song.mp3"
 python -m mp3gain_gui_py.legacy_cli /q /r /c /s r /d 1.5 "song.mp3"
 ```
 
-## Legacy C Source Comparison (1.5.2 vs 1.6.2)
+## Legacy C Source Comparison (primary vs secondary upstream snapshot)
 
 This section records the current in-repo comparison between:
 
 - `src/c/legacy/mp3gain-1_5_2-src`
-- `src/c/legacy/mp3gain-1_6_2-src`
+- the secondary imported upstream C snapshot under `src/c/legacy/`
 
 ### Snapshot Inventory
 
@@ -485,7 +485,7 @@ Approximate line churn (`+added/-removed`) across changed common files:
 This section records the current in-repo comparison between:
 
 - `src/vbs/legacy/mp3gain-win-gui-1_2_5-src`
-- `src/vbs/legacy/mp3gain-win-gui-1_3_4-src`
+- the secondary imported upstream VB6 snapshot under `src/vbs/legacy/`
 
 ### Snapshot Inventory
 

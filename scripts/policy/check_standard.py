@@ -30,6 +30,7 @@ ROOT_REQUIRED = (
     ".gitattributes",
     ".pre-commit-config.yaml",
     "pyproject.toml",
+    "uv.lock",
     "README.md",
 )
 
@@ -86,7 +87,7 @@ LEGACY_ROOT_CONFIG_PATTERNS = (
 CANONICAL_CONFIG_REQUIRED = ("config/app.defaults.toml", "config/app.example.toml")
 CANONICAL_CONFIG_LOCAL = "config/app.local.toml"
 REQUIRED_NAMING_RULE = "N"
-ALLOWED_NON_PACKAGE_SRC_DIRS = {"c"}
+ALLOWED_NON_PACKAGE_SRC_DIRS = {"c", "vbs"}
 REQUIRED_QT_NAMING_IGNORES = {
     "activateWindow",
     "closeEvent",

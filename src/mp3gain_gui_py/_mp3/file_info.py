@@ -50,13 +50,12 @@ def scan_file(path: Path) -> tuple[int, int]:
         )
         pos = 10 + id3_size
 
-    while True:
-        pos = find_next_frame(data, pos)
-        if pos < 0:
-            break
+    pos = find_next_frame(data, pos)
+    while pos >= 0:
         header = parse_frame_header(data, pos)
         if header is None:
             pos += 1
+            pos = find_next_frame(data, pos)
             continue
 
         if pos + header.frame_size_bytes > len(data):
@@ -79,6 +78,7 @@ def scan_file(path: Path) -> tuple[int, int]:
                 max_gain = gain
 
         pos += header.frame_size_bytes
+        pos = find_next_frame(data, pos)
 
     if min_gain > max_gain:
         return 0, 0

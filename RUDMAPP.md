@@ -1,4 +1,4 @@
-﻿# Full Legacy CLI Byte-Parity Program (89 dB, All Valid Switches)
+# Full Legacy CLI Byte-Parity Program (89 dB, All Valid Switches)
 
 ## Summary
 Build a strict command-line parity harness that compares `c:\bin\mp3gain-win-1_2_5\mp3gain.exe` vs Python CLI on `c:\tmp\mp3\original\*.mp3`, using only temporary writable copies under `c:\tmp\mp3\89dbcodex\...`, with parallel execution and byte-level output gates.

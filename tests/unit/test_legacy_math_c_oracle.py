@@ -12,7 +12,7 @@ from mp3gain_gui_py._legacy_exact.math import (
     legacy_steps_to_db_exact,
 )
 
-from ._c_oracle import CTagState, c_oracle_available, load_c_oracle
+from .c_oracle import CTagState, c_oracle_available, load_c_oracle
 
 
 def _require_oracle() -> object:
