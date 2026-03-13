@@ -9,6 +9,8 @@ from .registry import SettingsRegistry
 
 
 class UiSettingsDomain(SettingsDomainBase, SettingsRegistry):
+    """Expose persisted user-facing UI preferences with normalization."""
+
     @property
     def target_volume_db(self) -> float:
         return _norm.normalize_float(
@@ -119,6 +121,8 @@ class UiSettingsDomain(SettingsDomainBase, SettingsRegistry):
 
 
 class OpsSettingsDomain(SettingsDomainBase, SettingsRegistry):
+    """Expose persisted operation defaults and guardrail toggles."""
+
     @property
     def wrap_gain(self) -> bool:
         return _norm.normalize_bool(
@@ -164,6 +168,8 @@ class OpsSettingsDomain(SettingsDomainBase, SettingsRegistry):
 
 
 class SessionSettingsDomain(SettingsDomainBase, SettingsRegistry):
+    """Expose transient session state that should survive restarts."""
+
     @property
     def last_add_files_dir(self) -> str:
         return _norm.normalize_str(self._storage.value(self.LAST_ADD_FILES_DIR_KEY, ""))

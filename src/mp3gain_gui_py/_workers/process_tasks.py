@@ -72,6 +72,7 @@ def analyze_file_task(
     max_amp_only: bool,
     stored_tag_policy: StoredTagPolicy,
 ) -> FileResult:
+    """Analyze one file and return gain, amplitude, and clipping metadata."""
     path = Path(path_text)
     if stored_tag_policy == "check_only":
         tagged = _analyze_track_from_tags(path, target_db=target_db, allow_empty=False)
@@ -113,6 +114,7 @@ def album_group_gain_task(
     *,
     max_amp_only: bool,
 ) -> tuple[tuple[str, ...], float | None]:
+    """Analyze a group of files together and return the album gain result."""
     group_paths = [Path(path_text) for path_text in path_texts]
     try:
         album_raw_db, _album_min_gain, _album_max_gain, _album_max_amp = (
@@ -138,6 +140,7 @@ def gain_file_task(
     apply_zero_step: bool = False,
     forced_steps: int | None = None,
 ) -> FileResult:
+    """Apply one gain or undo operation and report the file result."""
     path = Path(path_text)
     options = LegacyCompatOptions(
         wrap_gain=wrap_gain,
@@ -213,6 +216,7 @@ def gain_file_task(
 def delete_tags_file_task(
     path_text: str, *, tag_mode: str | None = "apev2"
 ) -> FileResult:
+    """Delete MP3Gain tags from one file using the selected tag backend."""
     path = Path(path_text)
     try:
         tag_format: Literal["apev2", "id3"] | None

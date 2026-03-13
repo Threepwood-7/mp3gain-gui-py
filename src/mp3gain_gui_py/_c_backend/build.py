@@ -9,18 +9,22 @@ from pathlib import Path
 
 
 def repo_root() -> Path:
+    """Return the repository root that contains source and build assets."""
     return Path(__file__).resolve().parents[3]
 
 
 def legacy_source_dir() -> Path:
+    """Return the vendored legacy C backend source directory."""
     return repo_root() / "src" / "c" / "legacy" / "mp3gain-1_5_2-src"
 
 
 def backend_bin_dir() -> Path:
+    """Return the directory that stores compiled backend DLL artifacts."""
     return Path(__file__).resolve().parent / "bin"
 
 
 def backend_version_suffix() -> str | None:
+    """Extract the legacy backend version suffix from the source directory name."""
     source_dir_name = legacy_source_dir().name
     match = re.fullmatch(r"mp3gain-([0-9_]+)-src", source_dir_name)
     if match is None:
@@ -29,6 +33,7 @@ def backend_version_suffix() -> str | None:
 
 
 def backend_dll_path() -> Path:
+    """Return the expected output path for the compiled backend DLL."""
     version_suffix = backend_version_suffix()
     if version_suffix is None:
         return backend_bin_dir() / "mp3gain_legacy_backend.dll"
@@ -58,6 +63,7 @@ def _toolchain_ok() -> tuple[str | None, str]:
 
 
 def build_backend(*, force: bool = False) -> Path:
+    """Build the vendored legacy backend DLL when it is missing or stale."""
     gcc, reason = _toolchain_ok()
     if gcc is None:
         raise RuntimeError(reason)

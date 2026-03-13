@@ -435,6 +435,7 @@ _backend_instance: LegacyCBackend | None = None
 
 
 def get_backend(*, auto_build: bool = True) -> LegacyCBackend:
+    """Return the shared legacy C backend instance for the current process."""
     global _backend_instance
     with _backend_lock:
         if _backend_instance is None:

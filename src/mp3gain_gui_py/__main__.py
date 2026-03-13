@@ -6,6 +6,7 @@ import sys
 
 
 def main() -> int:
+    """Run the desktop application entry point."""
     from .app_controller import AppController
 
     ctrl = AppController(sys.argv)

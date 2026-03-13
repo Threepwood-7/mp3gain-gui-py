@@ -8,6 +8,7 @@ Legacy Pointers:
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from .formats import (
@@ -31,6 +32,8 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from .reader import TagData
+
+LOGGER = logging.getLogger(__name__)
 
 
 def write_tags(
@@ -119,8 +122,8 @@ def _delete_id3_keys(path: Path) -> None:
                     changed = True
         if changed:
             cast("Any", tags).save(str(path))
-    except Exception:
-        pass
+    except Exception as exc:
+        LOGGER.debug("Unable to delete MP3Gain ID3 keys from %s.", path, exc_info=exc)
 
 
 # ── Shared builder ─────────────────────────────────────────────────────────────
