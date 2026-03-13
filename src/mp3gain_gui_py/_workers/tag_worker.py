@@ -4,21 +4,24 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 from .process_tasks import delete_tags_file_task
-from .types import FileResult, WorkerRequest, WorkerResult
+from .types import FileResult, WorkerBridgeLike, WorkerRequest, WorkerResult
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from .worker_bridge import WorkerBridge
+_FutureResultT = TypeVar("_FutureResultT")
 
 
 class TagWorker:
     """Delete ReplayGain tags from a list of MP3 files."""
 
-    def __init__(self, request: WorkerRequest, bridge: WorkerBridge) -> None:
+    _request: WorkerRequest
+    _bridge: WorkerBridgeLike
+
+    def __init__(self, request: WorkerRequest, bridge: WorkerBridgeLike) -> None:
         self._request = request
         self._bridge = bridge
 
@@ -27,10 +30,12 @@ class TagWorker:
         return min(max(1, os.cpu_count() or 1), max(1, total))
 
     @staticmethod
-    def _cancel_pending_futures(futures: dict[Future[FileResult], Path]) -> None:
+    def _cancel_pending_futures(
+        futures: dict[Future[_FutureResultT], Path],
+    ) -> None:
         for future in futures:
             if not future.done():
-                future.cancel()
+                _ = future.cancel()
 
     def run(self) -> None:
         req = self._request

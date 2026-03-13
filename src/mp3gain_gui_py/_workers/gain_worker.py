@@ -5,22 +5,26 @@ from __future__ import annotations
 import os
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypeVar
 
 from .._legacy_exact.math import db_to_legacy_steps
 from .process_tasks import album_group_gain_task, gain_file_task
-from .types import FileResult, WorkerRequest, WorkerResult
+from .types import FileResult, WorkerBridgeLike, WorkerRequest, WorkerResult
 
 if TYPE_CHECKING:
-    from .worker_bridge import WorkerBridge
+    from collections.abc import Iterable
 
 _LEGACY_TARGET_DB = 89.0
+_FutureResultT = TypeVar("_FutureResultT")
 
 
 class GainWorker:
     """Apply gain changes to a list of MP3 files."""
 
-    def __init__(self, request: WorkerRequest, bridge: WorkerBridge) -> None:
+    _request: WorkerRequest
+    _bridge: WorkerBridgeLike
+
+    def __init__(self, request: WorkerRequest, bridge: WorkerBridgeLike) -> None:
         self._request = request
         self._bridge = bridge
 
@@ -29,10 +33,12 @@ class GainWorker:
         return min(max(1, os.cpu_count() or 1), max(1, total))
 
     @staticmethod
-    def _cancel_pending_futures(futures: dict[Future[Any], Any]) -> None:
+    def _cancel_pending_futures(
+        futures: Iterable[Future[_FutureResultT]],
+    ) -> None:
         for future in futures:
             if not future.done():
-                future.cancel()
+                _ = future.cancel()
 
     @staticmethod
     def _group_by_parent(paths: list[Path]) -> dict[str, list[Path]]:
@@ -74,7 +80,7 @@ class GainWorker:
             for future in as_completed(group_futures):
                 if self._bridge.is_cancelled and not cancelled:
                     cancelled = True
-                    self._cancel_pending_futures(group_futures)
+                    self._cancel_pending_futures(group_futures.keys())
                 if future.cancelled():
                     continue
                 try:
@@ -130,7 +136,7 @@ class GainWorker:
             for future in as_completed(futures):
                 if self._bridge.is_cancelled and not cancelled:
                     cancelled = True
-                    self._cancel_pending_futures(futures)
+                    self._cancel_pending_futures(futures.keys())
                 path = futures[future]
                 if future.cancelled():
                     continue

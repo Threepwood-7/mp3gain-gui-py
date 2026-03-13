@@ -25,9 +25,9 @@ class AppController:
     def __init__(self, argv: list[str] | None = None) -> None:
         argv_list = argv if argv is not None else sys.argv
 
-        configure_qsettings(APP_IDENTITY)
-        resolve_app_data_dir(APP_IDENTITY)
-        setup_logging_from_identity(APP_IDENTITY)
+        _ = configure_qsettings(APP_IDENTITY)
+        _ = resolve_app_data_dir(APP_IDENTITY)
+        _ = setup_logging_from_identity(APP_IDENTITY)
 
         existing = cast("QApplication | None", QApplication.instance())
         self.app: QApplication = (
@@ -38,15 +38,13 @@ class AppController:
         self.app.setApplicationDisplayName(APP_DISPLAY_NAME)
         self.app.setQuitOnLastWindowClosed(True)
 
-        self.settings = SettingsManager()
-        self.bridge = WorkerBridge(parent=self.app)
+        self.settings: SettingsManager = SettingsManager()
+        self.bridge: WorkerBridge = WorkerBridge(parent=self.app)
 
         # Import late to avoid circular dependency (ui needs controller)
         from .ui.main_window import MainWindow
 
-        self.window = MainWindow(
-            controller=self, settings=self.settings, bridge=self.bridge
-        )
+        self.window: MainWindow = MainWindow(settings=self.settings, bridge=self.bridge)
 
     def run(self) -> int:
         self.window.show()

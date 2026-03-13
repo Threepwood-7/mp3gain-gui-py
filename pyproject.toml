@@ -69,7 +69,6 @@ dependencies = [
   "basedpyright>=1.18",
   "deptry>=0.24",
   "vulture>=2.15",
-  "numpy>=1.26",
 ]
 
 [tool.hatch.envs.lint.scripts]
@@ -194,6 +193,7 @@ docstring-code-format = true
 
 [tool.deptry]
 known_first_party = ["mp3gain_gui_py", "_common", "parity_common"]
+per_rule_ignores = { DEP002 = ["numpy"] }
 
 [tool.basedpyright]
 pythonVersion = "3.13"

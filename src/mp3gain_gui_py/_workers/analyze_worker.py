@@ -6,21 +6,30 @@ import math
 import os
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypeVar
 
 from .process_tasks import album_group_gain_task, analyze_file_task
-from .types import FileResult, StoredTagPolicy, WorkerRequest, WorkerResult
+from .types import (
+    FileResult,
+    StoredTagPolicy,
+    WorkerBridgeLike,
+    WorkerRequest,
+    WorkerResult,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from .worker_bridge import WorkerBridge
+_FutureResultT = TypeVar("_FutureResultT")
 
 
 class AnalyzeWorker:
     """Run ReplayGain analysis on a list of paths."""
 
-    def __init__(self, request: WorkerRequest, bridge: WorkerBridge) -> None:
+    _request: WorkerRequest
+    _bridge: WorkerBridgeLike
+
+    def __init__(self, request: WorkerRequest, bridge: WorkerBridgeLike) -> None:
         self._request = request
         self._bridge = bridge
 
@@ -40,10 +49,12 @@ class AnalyzeWorker:
         return min(max(1, os.cpu_count() or 1), max(1, total))
 
     @staticmethod
-    def _cancel_pending_futures(futures: Iterable[Future[Any]]) -> None:
+    def _cancel_pending_futures(
+        futures: Iterable[Future[_FutureResultT]],
+    ) -> None:
         for future in futures:
             if not future.done():
-                future.cancel()
+                _ = future.cancel()
 
     def _collect_album_gain_map(
         self,

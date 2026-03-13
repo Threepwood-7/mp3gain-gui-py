@@ -11,9 +11,57 @@ from replaygain.py which selects the implementation at module load time.
 
 from __future__ import annotations
 
-import numpy as np
+import importlib
+from typing import Protocol, cast, overload
 
 from .coefficients import MAX_ORDER
+
+
+class _NDArrayLike(Protocol):
+    @overload
+    def __getitem__(self, key: int) -> float: ...
+
+    @overload
+    def __getitem__(self, key: slice) -> _NDArrayLike: ...
+
+    @overload
+    def __getitem__(self, key: object) -> float | _NDArrayLike: ...
+
+    @overload
+    def __setitem__(
+        self,
+        key: int,
+        value: float,
+    ) -> None: ...
+
+    @overload
+    def __setitem__(
+        self,
+        key: slice,
+        value: list[float] | _NDArrayLike,
+    ) -> None: ...
+
+    @overload
+    def __setitem__(
+        self,
+        key: object,
+        value: object,
+    ) -> None: ...
+
+    def tolist(self) -> list[float]: ...
+
+
+class _NumpyModuleLike(Protocol):
+    float64: object
+
+    def asarray(self, _obj: object, **_kwargs: object) -> _NDArrayLike: ...
+
+    def empty(self, _shape: int, **_kwargs: object) -> _NDArrayLike: ...
+
+
+# NumPy is an optional fast-path dependency, so import it lazily and type it
+# against the narrow surface this module actually uses.
+np = cast("_NumpyModuleLike", importlib.import_module("numpy"))
 
 
 def filter_yule(

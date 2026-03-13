@@ -2,17 +2,26 @@
 
 from __future__ import annotations
 
+from typing import final
+
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QVBoxLayout
+from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QLabel,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ...constants import APP_DISPLAY_NAME, APP_VERSION
 
 
+@final
 class AboutDialog(QDialog):
     """Displays application version and author credits."""
 
-    def __init__(self, parent: object = None) -> None:
-        super().__init__(parent)  # type: ignore[arg-type]
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
         self.setObjectName("about_dialog")
         self.setWindowTitle(f"About {APP_DISPLAY_NAME}")
         self.setMinimumWidth(380)
@@ -32,7 +41,7 @@ class AboutDialog(QDialog):
         label.setOpenExternalLinks(True)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok, self)
-        buttons.accepted.connect(self.accept)
+        _ = buttons.accepted.connect(self.accept)
 
         layout = QVBoxLayout(self)
         layout.addWidget(label)

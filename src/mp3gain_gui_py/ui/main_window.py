@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, final
 
 from PySide6.QtWidgets import QMainWindow, QMessageBox
 from threep_commons.qt.slots import safe_slot
@@ -16,29 +16,29 @@ from .window.persistence import WindowPersistenceCoordinator
 from .window.status import WindowStatusCoordinator
 
 if TYPE_CHECKING:
+    from PySide6.QtGui import QCloseEvent, QDragEnterEvent, QDropEvent
+
     from .._settings.manager import SettingsManager
     from .._workers.worker_bridge import WorkerBridge
-    from ..app_controller import AppController
 
 
+@final
 class MainWindow(QMainWindow):
     """Main application window — delegates to four coordinator objects."""
 
     def __init__(
         self,
-        controller: AppController,
         settings: SettingsManager,
         bridge: WorkerBridge,
-        parent: Any = None,
+        parent: QMainWindow | None = None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("main_window")
         self.setWindowTitle("MP3Gain")
         self.resize(900, 500)
 
-        self._controller = controller
-        self._settings = settings
-        self._bridge = bridge
+        self._settings: SettingsManager = settings
+        self._bridge: WorkerBridge = bridge
 
         # Model
         self.model: FileListModel = FileListModel(parent=self)
@@ -48,23 +48,25 @@ class MainWindow(QMainWindow):
             self, self.model
         )
         self.status_coord: WindowStatusCoordinator = WindowStatusCoordinator(self)
-        self._actions = WindowActionsCoordinator(self, settings, bridge)
-        self._persistence = WindowPersistenceCoordinator(
+        self._actions: WindowActionsCoordinator = WindowActionsCoordinator(
+            self, settings, bridge
+        )
+        self._persistence: WindowPersistenceCoordinator = WindowPersistenceCoordinator(
             self, settings, self.layout_coord
         )
 
         # Apply saved target volume
         self.layout_coord.target_volume_spin.setValue(settings.target_volume_db)
-        self.layout_coord.target_volume_spin.valueChanged.connect(
+        _ = self.layout_coord.target_volume_spin.valueChanged.connect(
             self._on_target_volume_changed
         )
 
         # Bridge signals
-        bridge.file_started.connect(self._on_file_started)
-        bridge.file_done.connect(self._on_file_done)
-        bridge.all_done.connect(self._on_all_done)
-        bridge.progress.connect(self._on_progress)
-        bridge.error.connect(self._on_bridge_error)
+        _ = bridge.file_started.connect(self._on_file_started)
+        _ = bridge.file_done.connect(self._on_file_done)
+        _ = bridge.all_done.connect(self._on_all_done)
+        _ = bridge.progress.connect(self._on_progress)
+        _ = bridge.error.connect(self._on_bridge_error)
 
         # Accept file drops on window
         self.setAcceptDrops(True)
@@ -79,19 +81,19 @@ class MainWindow(QMainWindow):
 
     # ── Close event ───────────────────────────────────────────────────────────
 
-    def closeEvent(self, event: Any) -> None:
+    def closeEvent(self, event: QCloseEvent) -> None:
         self.save_session()
         super().closeEvent(event)
 
     # ── Drag-and-drop ─────────────────────────────────────────────────────────
 
-    def dragEnterEvent(self, event: Any) -> None:
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
         else:
             event.ignore()
 
-    def dropEvent(self, event: Any) -> None:
+    def dropEvent(self, event: QDropEvent) -> None:
         urls = event.mimeData().urls()
         paths: list[Path] = []
         for url in urls:
@@ -114,10 +116,10 @@ class MainWindow(QMainWindow):
             self.status_coord.set_current_file(str(path.name))
 
     @safe_slot
-    def _on_file_done(self, result: Any) -> None:
+    def _on_file_done(self, result: object) -> None:
         if not isinstance(result, FileResult):
             return
-        kwargs: dict[str, Any] = {}
+        kwargs: dict[str, object] = {}
         if result.volume_db is not None:
             kwargs["volume_db"] = result.volume_db
         if result.track_gain_db is not None:
@@ -145,7 +147,7 @@ class MainWindow(QMainWindow):
         self.model.update_entry(result.path, **kwargs)
 
     @safe_slot
-    def _on_all_done(self, result: Any) -> None:
+    def _on_all_done(self, result: object) -> None:
         if not isinstance(result, WorkerResult):
             return
         self._actions.set_worker_active(False)

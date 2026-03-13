@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, Protocol
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -83,3 +83,18 @@ class WorkerResult:
     failed: int
     cancelled: bool = False
     error_msg: str = ""
+
+
+class WorkerBridgeLike(Protocol):
+    """Protocol used by background workers to report progress to the UI bridge."""
+
+    @property
+    def is_cancelled(self) -> bool: ...
+
+    def relay_file_started(self, path: Path) -> None: ...
+
+    def relay_file_done(self, result: FileResult) -> None: ...
+
+    def relay_progress(self, completed: int, total: int) -> None: ...
+
+    def relay_all_done(self, result: WorkerResult) -> None: ...
