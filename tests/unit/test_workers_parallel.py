@@ -26,16 +26,16 @@ class _FakeBridge:
         self.progress: list[tuple[int, int]] = []
         self.summary: WorkerResult | None = None
 
-    def _relay_file_started(self, path: Path) -> None:
+    def relay_file_started(self, path: Path) -> None:
         self.started.append(path)
 
-    def _relay_file_done(self, result: FileResult) -> None:
+    def relay_file_done(self, result: FileResult) -> None:
         self.done.append(result)
 
-    def _relay_progress(self, completed: int, total: int) -> None:
+    def relay_progress(self, completed: int, total: int) -> None:
         self.progress.append((completed, total))
 
-    def _relay_all_done(self, result: WorkerResult) -> None:
+    def relay_all_done(self, result: WorkerResult) -> None:
         self.summary = result
 
 

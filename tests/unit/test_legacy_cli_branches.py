@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 import mp3gain_gui_py.legacy_cli as legacy_cli
+import mp3gain_gui_py.legacy_cli_runtime as legacy_cli_runtime
 from mp3gain_gui_py._legacy_exact.processor import (
     LegacyCommandResult,
     LegacyCompatOptions,
@@ -111,10 +112,10 @@ class _BranchFakeProcessor:
 
 def _install_fake_processor(monkeypatch: pytest.MonkeyPatch) -> _BranchFakeProcessor:
     fake = _BranchFakeProcessor()
-    monkeypatch.setattr(legacy_cli, "LegacyExactProcessor", lambda: fake)
+    monkeypatch.setattr(legacy_cli_runtime, "LegacyExactProcessor", lambda: fake)
     monkeypatch.setattr(
-        legacy_cli,
-        "_write_runtime_tags",
+        legacy_cli_runtime,
+        "write_runtime_tags",
         lambda _processor, _path, _tags, *, tag_format, preserve_timestamp: None,
     )
     return fake
@@ -129,8 +130,8 @@ def test_check_only_branch_uses_tag_metrics_and_skips_processor_analysis(
     target.write_bytes(b"x")
     fake = _install_fake_processor(monkeypatch)
     monkeypatch.setattr(
-        legacy_cli,
-        "_load_runtime_tags",
+        legacy_cli_runtime,
+        "load_runtime_tags",
         lambda _processor, _path, *, tag_format: TagData(
             tag_format="apev2",
             track_gain_db=-9.21,
@@ -211,8 +212,8 @@ def test_track_apply_branch_uses_auto_tag_data_without_reanalysis(
     target.write_bytes(b"x")
     fake = _install_fake_processor(monkeypatch)
     monkeypatch.setattr(
-        legacy_cli,
-        "_load_runtime_tags",
+        legacy_cli_runtime,
+        "load_runtime_tags",
         lambda _processor, _path, *, tag_format: TagData(
             tag_format="apev2",
             track_gain_db=-9.21,
@@ -240,8 +241,8 @@ def test_album_apply_branch_uses_shared_album_steps_for_all_files(
     right.write_bytes(b"b")
     fake = _install_fake_processor(monkeypatch)
     monkeypatch.setattr(
-        legacy_cli,
-        "_load_runtime_tags",
+        legacy_cli_runtime,
+        "load_runtime_tags",
         lambda _processor, _path, *, tag_format: TagData(tag_format="none"),
     )
 
@@ -262,8 +263,8 @@ def test_undo_branch_calls_processor_undo(
     target.write_bytes(b"x")
     fake = _install_fake_processor(monkeypatch)
     monkeypatch.setattr(
-        legacy_cli,
-        "_load_runtime_tags",
+        legacy_cli_runtime,
+        "load_runtime_tags",
         lambda _processor, _path, *, tag_format: TagData(
             tag_format="apev2",
             undo_left=2,
@@ -286,12 +287,12 @@ def test_clip_guard_blocks_apply_without_c_or_k_or_f(
     target.write_bytes(b"x")
     fake = _install_fake_processor(monkeypatch)
     monkeypatch.setattr(
-        legacy_cli,
-        "_load_runtime_tags",
+        legacy_cli_runtime,
+        "load_runtime_tags",
         lambda _processor, _path, *, tag_format: TagData(tag_format="none"),
     )
     monkeypatch.setattr(
-        legacy_cli,
+        legacy_cli_runtime,
         "db_to_legacy_steps",
         lambda _gain, mp3_gain_mod=0: 10 + mp3_gain_mod,
     )

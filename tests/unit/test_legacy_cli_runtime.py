@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import mp3gain_gui_py.legacy_cli as legacy_cli
+import mp3gain_gui_py.legacy_cli_runtime as legacy_cli_runtime
 from mp3gain_gui_py._legacy_exact.processor import (
     LegacyCommandResult,
     LegacyCompatOptions,
@@ -80,10 +81,10 @@ class _FakeProcessor:
 
 def _install_fake_processor(monkeypatch: pytest.MonkeyPatch) -> _FakeProcessor:
     fake = _FakeProcessor()
-    monkeypatch.setattr(legacy_cli, "LegacyExactProcessor", lambda: fake)
+    monkeypatch.setattr(legacy_cli_runtime, "LegacyExactProcessor", lambda: fake)
     monkeypatch.setattr(
-        legacy_cli,
-        "_write_runtime_tags",
+        legacy_cli_runtime,
+        "write_runtime_tags",
         lambda _processor, _path, _tags, *, tag_format, preserve_timestamp: None,
     )
     return fake
@@ -132,8 +133,8 @@ def test_runtime_modifiers_m_and_d_execute_python_path(
     target.write_bytes(b"x")
     fake = _install_fake_processor(monkeypatch)
     monkeypatch.setattr(
-        legacy_cli,
-        "_load_runtime_tags",
+        legacy_cli_runtime,
+        "load_runtime_tags",
         lambda _processor, _path, *, tag_format: TagData(tag_format="none"),
     )
 
@@ -152,8 +153,8 @@ def test_runtime_undo_uses_python_processor(
     target.write_bytes(b"x")
     fake = _install_fake_processor(monkeypatch)
     monkeypatch.setattr(
-        legacy_cli,
-        "_load_runtime_tags",
+        legacy_cli_runtime,
+        "load_runtime_tags",
         lambda _processor, _path, *, tag_format: TagData(
             tag_format="apev2",
             undo_left=2,
